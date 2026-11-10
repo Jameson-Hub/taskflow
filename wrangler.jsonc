@@ -16,8 +16,10 @@
       "migrations_dir": "migrations"
     }
   ],
-  // Nightly demo reset, 00:00 UTC.
+  // Nightly: reset the demo workspace and delete workspaces unused for 30 days. 00:00 UTC.
   "triggers": { "crons": ["0 0 * * *"] },
+  // Sign-up and login: 10 attempts per minute per IP.
+  "ratelimits": [{ "name": "AUTH_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
 
   // Production is the top level above. `dev` is a separate Worker with its own database,
   // used by pull-request previews so they never touch production data.
@@ -33,7 +35,8 @@
           "migrations_dir": "migrations"
         }
       ],
-      "triggers": { "crons": ["0 0 * * *"] }
+      "triggers": { "crons": ["0 0 * * *"] },
+      "ratelimits": [{ "name": "AUTH_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }]
     }
   }
 }

@@ -11,12 +11,20 @@ export interface User {
   name: string;
   role: Role;
   is_demo: number;
+  workspace_id: number;
+  workspace: string;
+  last_seen_at: string | null;
 }
 
-export const USER_COLUMNS = "id, email, name, role, is_demo";
+const USER_COLUMNS = "u.id, u.email, u.name, u.role, u.is_demo, u.workspace_id, u.last_seen_at, w.name AS workspace";
+const FROM_USERS = "FROM users u JOIN workspaces w ON w.id = u.workspace_id";
+
+/** Every user query goes through these, so the workspace always comes along. Filter with `u.`-prefixed columns. */
+export const SELECT_USER = `SELECT ${USER_COLUMNS} ${FROM_USERS}`;
+export const SELECT_USER_WITH_PASSWORD = `SELECT ${USER_COLUMNS}, u.password_hash ${FROM_USERS}`;
 
 export function publicUser(u: User) {
-  return { id: u.id, email: u.email, name: u.name, role: u.role, demo: u.is_demo === 1 };
+  return { id: u.id, email: u.email, name: u.name, role: u.role, demo: u.is_demo === 1, workspace: u.workspace };
 }
 
 const toHex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -45,9 +53,16 @@ export async function sessionUser(c: Context, db: D1Database): Promise<User | nu
   const token = getCookie(c, SESSION_COOKIE);
   if (!token) return null;
   return db
-    .prepare(`SELECT ${USER_COLUMNS} FROM users WHERE id = (SELECT user_id FROM sessions WHERE id = ? AND expires_at > ?)`)
+    .prepare(`${SELECT_USER} WHERE u.id = (SELECT user_id FROM sessions WHERE id = ? AND expires_at > ?)`)
     .bind(await sha256(token), new Date().toISOString())
     .first<User>();
+}
+
+/** Recorded at most once a day per user; inactive workspaces are cleaned up from it. */
+export function touchLastSeen(db: D1Database, user: User) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (user.last_seen_at?.startsWith(today)) return null;
+  return db.prepare("UPDATE users SET last_seen_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
 }
 
 export async function endSession(c: Context, db: D1Database) {

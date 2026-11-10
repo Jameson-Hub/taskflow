@@ -36,7 +36,10 @@ export function TeamPage({ me, team, setTeam }: Props) {
   return (
     <section className="page">
       <h1>Team</h1>
-      <p className="muted">Admins add people and set roles. Demo accounts keep their roles so the demo stays usable.</p>
+      <p className="muted">
+        Admins add people to <strong>{me.workspace}</strong> and set their roles.
+        {me.demo && " Demo accounts keep their roles so the demo stays usable."}
+      </p>
 
       <ErrorText error={error} />
 
@@ -93,7 +96,11 @@ export function TeamPage({ me, team, setTeam }: Props) {
         </label>
         <button className="primary">Add</button>
       </form>
-      <p className="muted small">New people can sign in with email on the login page until the nightly reset.</p>
+      <p className="muted small">
+        {me.demo
+          ? "In the demo, use an @example.com address. New people can sign in with it until the nightly reset."
+          : "New people sign in with their email and password on the login page."}
+      </p>
     </section>
   );
 }

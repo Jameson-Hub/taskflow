@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, loginAs, riley, runNightlyReset } from "./helpers";
+import { api, freshDatabase, loginAs, riley } from "./helpers";
 
-beforeEach(runNightlyReset);
+beforeEach(freshDatabase);
 
 describe("managing users", () => {
   it.each(["manager", "member"] as const)("is admin-only (%s gets 403)", async (role) => {
@@ -45,5 +45,14 @@ describe("managing users", () => {
   it("keeps demo accounts' roles fixed so the demo can't be broken", async () => {
     const res = await api("/api/users/2", { method: "PATCH", cookie: await loginAs("admin"), body: { role: "member" } });
     expect(res.status).toBe(403);
+  });
+});
+
+describe("adding people to the shared demo", () => {
+  it("only accepts example.com addresses, so nobody can claim a real person's email", async () => {
+    const admin = await loginAs("admin");
+    const add = (email: string) => api("/api/users", { method: "POST", cookie: admin, body: { ...riley, email } });
+    expect((await add("someone@gmail.com")).status).toBe(400);
+    expect((await add("someone@example.com")).status).toBe(201);
   });
 });

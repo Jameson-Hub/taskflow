@@ -248,16 +248,52 @@ fieldset {
   border-color: var(--accent);
 }
 
-.password-login summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 0.9rem;
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 10px;
+  background: var(--surface-2);
 }
 
-.password-login form {
+.segmented button {
+  background: transparent;
+  color: var(--muted);
+  padding: 0.45rem 0.5rem;
+  white-space: normal;
+}
+
+.segmented button[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+.stack {
   display: grid;
   gap: 0.8rem;
-  margin-top: 0.9rem;
+}
+
+/* Honeypot: off-screen rather than display:none, which some bots skip. */
+.trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.workspace-name {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Shell */

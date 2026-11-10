@@ -2,7 +2,7 @@
 
 A team task board with authentication, role-based access and a Kanban workflow. Runs entirely on Cloudflare's free tier: one Worker serves the React app and the API, and D1 (SQLite) stores the data.
 
-**Live demo:** https://taskflow.bagainjameson.workers.dev. Pick a role on the login screen to look around. The demo workspace resets every night at 00:00 UTC.
+**Live demo:** https://taskflow.bagainjameson.workers.dev. Pick a role to look around the shared demo board, which resets every night at 00:00 UTC, or create an account to get a private workspace of your own.
 
 ## Features
 
@@ -20,7 +20,8 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 
 - **Activity log** recording who created, changed, moved, deleted or commented on what, and role changes
 - **Comments, due dates, priorities**, search and filters
-- **One-click demo logins** plus email/password accounts for people an admin adds
+- **Sign up for a private workspace**: you become its admin and add your team. Workspaces are fully isolated from each other.
+- **One-click demo logins** for a shared demo board that resets nightly
 
 ## Stack
 
@@ -38,12 +39,14 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 ```
 Browser ──► Worker ─┬─ /api/*  → Hono routes → D1
                     └─ else    → static React build (SPA fallback)
-          Cron 00:00 UTC ──► reset demo data
+          Cron 00:00 UTC ──► reset demo workspace, delete inactive ones
 ```
 
 - **Sessions:** a random 256-bit token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Only its SHA-256 hash is stored, so a leaked table can't be used to sign in. Logout deletes the row.
 - **Passwords:** PBKDF2-SHA256 with a per-user salt, compared in constant time. Unknown emails still run a hash, so timing doesn't reveal which accounts exist.
 - **CSRF:** every non-GET request must carry an `Origin` header matching the app.
+- **Multi-tenancy:** every query is scoped to the caller's workspace, so another workspace's data reads as "not found". Tests prove each endpoint stays inside its workspace.
+- **Abuse without upkeep:** sign-up and login are rate-limited per IP, sign-up has a honeypot field, and a nightly job deletes workspaces nobody has used for 30 days. There is no password reset, since that would need an email domain.
 - **Authorization** lives in the API. The UI hides what a role can't do, but the server is the authority, and the tests prove it.
 - **Ordering:** cards use fractional positions, so a move rewrites one row instead of renumbering the column.
 - **Atomic logging:** each change and its activity entry are written in one D1 batch.

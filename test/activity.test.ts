@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, loginAs, riley, runNightlyReset } from "./helpers";
+import { api, freshDatabase, loginAs, riley } from "./helpers";
 
-beforeEach(runNightlyReset);
+beforeEach(freshDatabase);
 
 type Entry = { action: string; actor: { name: string }; task_id: number | null; detail: Record<string, unknown> };
 

@@ -1,6 +1,7 @@
 import { createExecutionContext, createScheduledController, env, waitOnExecutionContext } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import worker from "../src/worker";
+import { DEMO_WORKSPACE } from "../src/worker/seed";
 
 import type { Role } from "../src/shared/domain";
 
@@ -12,9 +13,16 @@ const ORIGIN = "http://taskflow.test";
 
 export async function api(
   path: string,
-  { method = "GET", body, cookie, origin = ORIGIN }: { method?: string; body?: unknown; cookie?: string; origin?: string | null } = {},
+  {
+    method = "GET",
+    body,
+    cookie,
+    origin = ORIGIN,
+    ip,
+  }: { method?: string; body?: unknown; cookie?: string; origin?: string | null; ip?: string } = {},
 ) {
   const headers = new Headers();
+  if (ip) headers.set("CF-Connecting-IP", ip);
   if (cookie) headers.set("Cookie", cookie);
   if (origin) headers.set("Origin", origin);
   if (body !== undefined) headers.set("Content-Type", "application/json");
@@ -38,4 +46,32 @@ export async function runNightlyReset() {
   const ctx = createExecutionContext();
   await worker.scheduled!(createScheduledController(), env, ctx);
   await waitOnExecutionContext(ctx);
+}
+
+export const ana = { name: "Ana Reyes", email: "ana@example.com", password: "a long enough password", workspace: "Ana's Studio" };
+
+export async function signUp(details: Partial<typeof ana> & { website?: string } = {}, ip?: string) {
+  return api("/api/auth/signup", { method: "POST", body: { ...ana, ...details }, ip });
+}
+
+export async function loginWithPassword(email = ana.email, password = ana.password, ip?: string) {
+  return api("/api/auth/login", { method: "POST", body: { email, password }, ip });
+}
+
+export async function getJson<T>(path: string, cookie: string) {
+  return (await api(path, { cookie })).json() as Promise<T>;
+}
+
+/** The state a just-migrated database is in: only the (empty) demo workspace row. */
+export async function emptyDatabase() {
+  await env.DB.batch([
+    ...["activity", "comments", "tasks", "sessions", "users"].map((table) => env.DB.prepare(`DELETE FROM ${table}`)),
+    env.DB.prepare("DELETE FROM workspaces WHERE id <> ?").bind(DEMO_WORKSPACE),
+  ]);
+}
+
+/** Every test starts from an empty database with the demo seeded. */
+export async function freshDatabase() {
+  await emptyDatabase();
+  await runNightlyReset();
 }

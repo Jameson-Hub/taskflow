@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, loginAs, runNightlyReset } from "./helpers";
+import { api, freshDatabase, loginAs } from "./helpers";
 
-beforeEach(runNightlyReset);
+beforeEach(freshDatabase);
 
 const TASK = 1;
 

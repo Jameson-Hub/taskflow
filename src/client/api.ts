@@ -9,6 +9,7 @@ export interface User {
   name: string;
   role: Role;
   demo: boolean;
+  workspace: string;
 }
 
 export interface Task {
@@ -58,10 +59,12 @@ export const api = {
   me: () => request<User>("GET", "/me"),
   demoLogin: (role: Role) => request<User>("POST", "/auth/demo", { role }),
   login: (email: string, password: string) => request<User>("POST", "/auth/login", { email, password }),
+  signup: (details: { name: string; email: string; password: string; workspace: string; website: string }) =>
+    request<User>("POST", "/auth/signup", details),
   logout: () => request("POST", "/auth/logout"),
 
   users: () => request<User[]>("GET", "/users"),
-  createUser: (user: Omit<User, "id" | "demo"> & { password: string }) => request<User>("POST", "/users", user),
+  createUser: (user: Pick<User, "name" | "email" | "role"> & { password: string }) => request<User>("POST", "/users", user),
   setRole: (id: number, role: Role) => request<User>("PATCH", `/users/${id}`, { role }),
 
   tasks: (filters: Record<string, string>) => {

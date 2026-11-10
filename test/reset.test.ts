@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, loginAs, riley, runNightlyReset } from "./helpers";
+import { api, freshDatabase, loginAs, riley, runNightlyReset } from "./helpers";
 
-beforeEach(runNightlyReset);
+beforeEach(freshDatabase);
 
 describe("nightly reset", () => {
   it("restores the demo workspace and signs everyone out", async () => {

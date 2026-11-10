@@ -168,7 +168,9 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                   );
                 })}
               </ul>
-              {cards.length === 0 && <p className="empty">Nothing here yet</p>}
+              {cards.length === 0 && (
+                <p className="empty">{tasks.length === 0 && status === "todo" ? "Your board is empty. Add your first task." : "Nothing here yet"}</p>
+              )}
             </section>
           );
         })}

@@ -21,28 +21,43 @@ const TASKS: SeedTask[] = [
   { title: "Customer interview notes", status: "done", priority: "low", assignee: 2, creator: 1, dueInDays: null },
 ];
 
-/** Wipes everything and restores the demo workspace. Runs nightly and in tests. */
+export const DEMO_WORKSPACE = 1;
+const INACTIVE_DAYS = 30;
+
+/** Rebuilds the demo workspace from scratch; real workspaces are untouched. Runs nightly and in tests. */
 export async function resetDemo(db: D1Database) {
   const day = (offset: number | null) =>
     offset === null ? null : new Date(Date.now() + offset * DAY_MS).toISOString().slice(0, 10);
+  const userId = "(SELECT id FROM users WHERE email = ?)";
 
   await db.batch([
-    db.prepare("DELETE FROM activity"),
-    db.prepare("DELETE FROM comments"),
-    db.prepare("DELETE FROM tasks"),
-    db.prepare("DELETE FROM sessions"),
-    db.prepare("DELETE FROM users"),
-    ...TEAM.map((u, i) =>
+    // Cascades to the demo's people, sessions, tasks, comments and activity.
+    db.prepare("DELETE FROM workspaces WHERE id = ?").bind(DEMO_WORKSPACE),
+    db.prepare("INSERT INTO workspaces (id, name) VALUES (?, 'Demo workspace')").bind(DEMO_WORKSPACE),
+    ...TEAM.map((u) =>
       db
-        .prepare("INSERT INTO users (id, email, name, role, is_demo) VALUES (?, ?, ?, ?, 1)")
-        .bind(i + 1, u.email, u.name, u.role),
+        .prepare("INSERT INTO users (email, name, role, is_demo, workspace_id) VALUES (?, ?, ?, 1, ?)")
+        .bind(u.email, u.name, u.role, DEMO_WORKSPACE),
     ),
     ...TASKS.map(({ title, status, priority, assignee, creator, dueInDays }, i) =>
       db
         .prepare(
-          "INSERT INTO tasks (title, status, priority, position, assignee_id, created_by, due_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          `INSERT INTO tasks (workspace_id, title, status, priority, position, assignee_id, created_by, due_date)
+           VALUES (?, ?, ?, ?, ?, ${userId}, ${userId}, ?)`,
         )
-        .bind(title, status, priority, i + 1, assignee === null ? null : assignee + 1, creator + 1, day(dueInDays)),
+        .bind(DEMO_WORKSPACE, title, status, priority, i + 1, assignee === null ? null : TEAM[assignee]!.email, TEAM[creator]!.email, day(dueInDays)),
     ),
   ]);
+}
+
+/** Deletes real workspaces nobody has used for 30 days, so abandoned and spam sign-ups clear themselves. */
+export async function deleteInactiveWorkspaces(db: D1Database) {
+  const cutoff = new Date(Date.now() - INACTIVE_DAYS * DAY_MS).toISOString();
+  await db
+    .prepare(
+      `DELETE FROM workspaces WHERE id <> ? AND NOT EXISTS (
+         SELECT 1 FROM users u WHERE u.workspace_id = workspaces.id AND datetime(COALESCE(u.last_seen_at, u.created_at)) > datetime(?))`,
+    )
+    .bind(DEMO_WORKSPACE, cutoff)
+    .run();
 }

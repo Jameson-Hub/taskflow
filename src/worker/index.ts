@@ -5,11 +5,11 @@ import { z } from "zod";
 import { activity } from "./activity";
 import { comments } from "./comments";
 import { fail, readBody, type AppEnv } from "./http";
-import { verifyPassword } from "./password";
-import { resetDemo } from "./seed";
-import { endSession, publicUser, sessionUser, startSession, USER_COLUMNS, type User } from "./session";
+import { hashPassword, verifyPassword } from "./password";
+import { DEMO_WORKSPACE, deleteInactiveWorkspaces, resetDemo } from "./seed";
+import { endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
 import { tasks } from "./tasks";
-import { roleBody, users } from "./users";
+import { newUser, roleBody, users } from "./users";
 
 const app = new Hono<AppEnv>().basePath("/api");
 
@@ -27,17 +27,29 @@ app.use("/*", async (c, next) => {
   await next();
 });
 
+// Slows down password guessing and sign-up spam, per client IP.
+const rateLimited = createMiddleware<AppEnv>(async (c, next) => {
+  const ip = c.req.header("CF-Connecting-IP") ?? "local";
+  const { success } = await c.env.AUTH_LIMITER.limit({ key: `${c.req.path}:${ip}` });
+  if (!success) fail(429, "Too many attempts. Wait a minute and try again.");
+  await next();
+});
+
 const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   const user = await sessionUser(c, c.env.DB);
   if (!user) fail(401, "Not signed in");
   c.set("user", user);
+  const touch = touchLastSeen(c.env.DB, user);
+  if (touch) c.executionCtx.waitUntil(touch);
   await next();
 });
 
 app.post("/auth/demo", async (c) => {
   const { role } = await readBody(c, roleBody, "Pick a role");
   const findDemo = () =>
-    c.env.DB.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE role = ? AND is_demo = 1 ORDER BY id LIMIT 1`).bind(role).first<User>();
+    c.env.DB.prepare(`${SELECT_USER} WHERE u.role = ? AND u.workspace_id = ? AND u.is_demo = 1 ORDER BY u.id LIMIT 1`)
+      .bind(role, DEMO_WORKSPACE)
+      .first<User>();
   let user = await findDemo();
   // A fresh database (first deploy, before the nightly job) seeds itself on first use.
   if (!user) {
@@ -49,13 +61,40 @@ app.post("/auth/demo", async (c) => {
   return c.json(publicUser(user));
 });
 
-app.post("/auth/login", async (c) => {
+const signup = newUser.pick({ name: true, email: true, password: true }).extend({
+  workspace: z.string().trim().min(1).max(80),
+  website: z.literal("").optional(),
+});
+
+app.post("/auth/signup", rateLimited, async (c) => {
+  const { name, email, password, workspace } = await readBody(c, signup, "Check your name, email, workspace name and a password of 12+ characters");
+  const hash = await hashPassword(password);
+  let user: User;
+  try {
+    // One transaction: if the email is taken, the workspace insert rolls back too.
+    const results = await c.env.DB.batch<User>([
+      c.env.DB.prepare("INSERT INTO workspaces (name) VALUES (?)").bind(workspace),
+      c.env.DB.prepare(
+        "INSERT INTO users (email, name, role, password_hash, workspace_id, last_seen_at) VALUES (?, ?, 'admin', ?, last_insert_rowid(), ?)",
+      ).bind(email, name, hash, new Date().toISOString()),
+      c.env.DB.prepare(`${SELECT_USER} WHERE u.id = last_insert_rowid()`),
+    ]);
+    user = results.at(-1)!.results[0]!;
+  } catch (err) {
+    if (String(err).includes("UNIQUE")) fail(409, "That email is already registered. Sign in instead.");
+    throw err;
+  }
+  await startSession(c, c.env.DB, user.id);
+  return c.json(publicUser(user), 201);
+});
+
+app.post("/auth/login", rateLimited, async (c) => {
   const { email, password } = await readBody(
     c,
     z.object({ email: z.string(), password: z.string() }),
     "Email and password are required",
   );
-  const user = await c.env.DB.prepare(`SELECT ${USER_COLUMNS}, password_hash FROM users WHERE email = ?`)
+  const user = await c.env.DB.prepare(`${SELECT_USER_WITH_PASSWORD} WHERE u.email = ?`)
     .bind(email)
     .first<User & { password_hash: string | null }>();
   const valid = await verifyPassword(password, user?.password_hash ?? null);
@@ -81,6 +120,6 @@ app.route("/activity", activity);
 export default {
   fetch: app.fetch,
   async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(resetDemo(env.DB));
+    ctx.waitUntil(Promise.all([resetDemo(env.DB), deleteInactiveWorkspaces(env.DB)]));
   },
 } satisfies ExportedHandler<Env>;

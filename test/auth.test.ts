@@ -1,8 +1,8 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, loginAs, riley, runNightlyReset, sessionCookie } from "./helpers";
+import { api, freshDatabase, loginAs, riley, sessionCookie } from "./helpers";
 
-beforeEach(runNightlyReset);
+beforeEach(freshDatabase);
 
 describe("demo login", () => {
   it("signs in as the chosen role and keeps the session", async () => {

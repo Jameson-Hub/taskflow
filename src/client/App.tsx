@@ -53,6 +53,9 @@ export function App() {
           <img src="/favicon.svg" alt="" width={24} height={24} />
           TaskFlow
         </a>
+        <span className="workspace-name" title="Workspace">
+          {user.workspace}
+        </span>
         <nav className="tabs" aria-label="Sections">
           {tabs
             .filter((t) => t.show)
@@ -71,7 +74,7 @@ export function App() {
           </button>
         </div>
       </header>
-      <p className="notice">Demo workspace. Everything resets at midnight UTC.</p>
+      {user.demo && <p className="notice">Demo workspace. Everything resets at midnight UTC.</p>}
       <main>
         {current === "board" && <Board user={user} team={team} />}
         {current === "activity" && <ActivityPage team={team} />}
