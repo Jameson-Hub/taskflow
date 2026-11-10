@@ -2,7 +2,7 @@
 
 A team task board with authentication, role-based access and a Kanban workflow. Runs entirely on Cloudflare's free tier: one Worker serves the React app and the API, and D1 (SQLite) stores the data.
 
-**Live demo:** _coming soon_. Pick a role on the login screen to look around. The demo workspace resets every night at 00:00 UTC.
+**Live demo:** https://taskflow.bagainjameson.workers.dev. Pick a role on the login screen to look around. The demo workspace resets every night at 00:00 UTC.
 
 ## Features
 

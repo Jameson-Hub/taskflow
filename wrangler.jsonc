@@ -12,8 +12,7 @@
     {
       "binding": "DB",
       "database_name": "taskflow",
-      // Replaced with the real id after `wrangler d1 create taskflow`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "085e0f83-b826-4da3-b7c7-715242d3d16c",
       "migrations_dir": "migrations"
     }
   ],
@@ -30,8 +29,7 @@
         {
           "binding": "DB",
           "database_name": "taskflow-dev",
-          // Replaced with the real id after `wrangler d1 create taskflow-dev`.
-          "database_id": "00000000-0000-0000-0000-000000000001",
+          "database_id": "471c72df-8225-4e61-aff6-8826fa6994ad",
           "migrations_dir": "migrations"
         }
       ],
