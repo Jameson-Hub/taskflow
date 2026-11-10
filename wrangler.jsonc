@@ -1,0 +1,41 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "taskflow",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "taskflow",
+      // Replaced with the real id after `wrangler d1 create taskflow`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Nightly demo reset, 00:00 UTC.
+  "triggers": { "crons": ["0 0 * * *"] },
+
+  // Production is the top level above. `dev` is a separate Worker with its own database,
+  // used by pull-request previews so they never touch production data.
+  // Local development (`npm run dev`) uses a third, on-disk database under .wrangler/.
+  "env": {
+    "dev": {
+      "name": "taskflow-dev",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "taskflow-dev",
+          // Replaced with the real id after `wrangler d1 create taskflow-dev`.
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "triggers": { "crons": ["0 0 * * *"] }
+    }
+  }
+}
