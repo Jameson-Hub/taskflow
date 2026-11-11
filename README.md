@@ -22,6 +22,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 
 - **Dashboard** with open, overdue and due-this-week counts, average days to finish, finished work per week, a "needs attention" list, the next 14 days, and bar charts of work by status, priority, person and label. Click a bar to open the board filtered to it, or switch to just your own tasks.
 - **Activity log** recording who created, changed, moved, deleted or commented on what, and role changes
+- **@mentions in comments**, highlighted, with a "Mentions me" filter on the board (no emails to manage)
 - **Comments, due dates, priorities, labels, checklists** (progress shown on the card), search and filters
 - **Sign up for a private workspace**: you become its admin and add your team. Workspaces are fully isolated from each other.
 - **Invite links**: an admin creates a single-use link for a role, valid for 7 days, and the person joining picks their own password.
@@ -86,7 +87,7 @@ npm run test:e2e  # browser tests against the built app
 
 - **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, search, labels, checklists, the dashboard counts, live updates, the activity log and the nightly reset.
 - **Unit tests** (`test/unit/`) cover the pure logic on its own: the permission rules, password hashing and where a moved card lands.
-- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, and joining by invite link. Run them with `npm run test:e2e`; locally they use your installed Chrome.
+- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, @mentions, and joining by invite link. Run them with `npm run test:e2e`; locally they use your installed Chrome.
 
 ## Deployment
 

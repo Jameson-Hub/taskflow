@@ -1,14 +1,25 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { z } from "zod";
+import { MAX_COMMENT, MAX_MENTIONS } from "../shared/domain";
 import { can } from "../shared/policy";
 import { logActivity } from "./activity";
 import { fail, idParam, orNotFound, readBody, type AppEnv } from "./http";
 
-type CommentRow = { id: number; task_id: number; user_id: number; author_name: string; body: string; created_at: string };
+/** `mentions` is a JSON array of user ids. */
+type CommentRow = { id: number; task_id: number; user_id: number; author_name: string; body: string; mentions: string; created_at: string };
 type CommentsEnv = AppEnv & { Variables: { task: { id: number; title: string } } };
 
-const toComment = ({ user_id, author_name, ...rest }: CommentRow) => ({ ...rest, author: { id: user_id, name: author_name } });
+const toComment = ({ user_id, author_name, mentions, ...rest }: CommentRow) => ({
+  ...rest,
+  mentions: JSON.parse(mentions) as number[],
+  author: { id: user_id, name: author_name },
+});
+
+const newComment = z.object({
+  body: z.string().trim().min(1).max(MAX_COMMENT),
+  mentions: z.array(z.number().int()).max(MAX_MENTIONS).default([]),
+});
 
 // Mounted at /tasks/:taskId/comments.
 export const comments = new Hono<CommentsEnv>();
@@ -35,10 +46,16 @@ comments.get("/", async (c) => {
 });
 
 comments.post("/", async (c) => {
-  const { body } = await readBody(c, z.object({ body: z.string().trim().min(1).max(2000) }), "Write something first");
+  const { body, mentions } = await readBody(c, newComment, "Write something first");
   const { task, user } = c.var;
   const [inserted] = await c.env.DB.batch<Omit<CommentRow, "author_name">>([
-    c.env.DB.prepare("INSERT INTO comments (task_id, user_id, body) VALUES (?, ?, ?) RETURNING *").bind(task.id, user.id, body),
+    // Mentions keep only people on the caller's team, once each.
+    c.env.DB.prepare(
+      `INSERT INTO comments (task_id, user_id, body, mentions) VALUES (?1, ?2, ?3, (
+         SELECT json_group_array(id) FROM (
+           SELECT u.id FROM users u WHERE u.workspace_id = ?4 AND u.deleted_at IS NULL AND u.id IN (SELECT value FROM json_each(?5)) ORDER BY u.id))
+       ) RETURNING *`,
+    ).bind(task.id, user.id, body, user.workspace_id, JSON.stringify(mentions)),
     logActivity(c.env.DB, user, task.id, "comment.added", { title: task.title }),
     // A discussion is work on the task, so it no longer counts as untouched.
     c.env.DB.prepare("UPDATE tasks SET updated_at = datetime('now') WHERE id = ?").bind(task.id),

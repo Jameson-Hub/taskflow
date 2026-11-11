@@ -138,3 +138,26 @@ test("a deleted task can be undone for a few seconds, then it's gone for good", 
   await page.reload();
   await expect(page.getByText("Your board is empty")).toBeVisible();
 });
+
+test("@mentions suggest teammates, are highlighted, and drive the 'Mentions me' filter", async ({ page }) => {
+  await signUp(page, `Mentions ${unique()}`);
+  for (const title of ["Needs a look", "Nobody mentioned here"]) {
+    await page.getByRole("button", { name: "+ New task" }).click();
+    await page.getByLabel("Title").fill(title);
+    await page.getByRole("button", { name: "Create task" }).click();
+  }
+
+  await page.getByRole("region", { name: "To do" }).getByText("Needs a look").click();
+  const box = page.getByLabel("Write a comment");
+  await box.fill("Can you check this @E2E");
+  await expect(page.getByRole("listbox", { name: "Mention someone" }).getByRole("option", { name: "E2E Admin" })).toBeVisible();
+  await box.press("Enter"); // picks the suggestion instead of sending
+  await expect(box).toHaveValue("Can you check this @E2E Admin ");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.locator("mark.mention", { hasText: "@E2E Admin" })).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.getByLabel("Mentions me").check();
+  await expect(page.getByText("Needs a look")).toBeVisible();
+  await expect(page.getByText("Nobody mentioned here")).toHaveCount(0);
+});

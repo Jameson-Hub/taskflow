@@ -27,6 +27,8 @@ export const DUE_SOON_WINDOW_DAYS = 7;
 export const MAX_LABELS = 5;
 export const MAX_LABEL_LENGTH = 24;
 export const MAX_CHECKLIST = 20;
+export const MAX_COMMENT = 2000;
+export const MAX_MENTIONS = 20;
 export const MAX_CHECKLIST_TEXT = 200;
 export type ChecklistItem = { text: string; done: boolean };
 /** Labels are compared and stored like this, so "Bug " and "bug" are the same label. */

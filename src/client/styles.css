@@ -647,6 +647,48 @@ a.bar-row:focus-visible {
   font-weight: 600;
 }
 
+.mention-box {
+  position: relative;
+  flex: 1;
+}
+
+.mention-box input {
+  width: 100%;
+}
+
+.mention-suggestions {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  min-width: 12rem;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.mention-suggestions button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 0.3rem 0.5rem;
+}
+
+.mention-suggestions li[aria-selected="true"] button,
+.mention-suggestions button:hover {
+  background: var(--surface-2);
+}
+
+mark.mention {
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Honeypot: off-screen rather than display:none, which some bots skip. */
 .trap {
   position: absolute;

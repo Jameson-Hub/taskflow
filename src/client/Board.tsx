@@ -19,6 +19,7 @@ export function Board({ user, team }: { user: User; team: User[] }) {
     assignee: linked.get("assignee") ?? "",
     priority: linked.get("priority") ?? "",
     label: linked.get("label") ?? "",
+    mentioned: "",
   }));
   useEffect(() => {
     if (location.hash.includes("?")) history.replaceState(null, "", "#board");
@@ -240,6 +241,14 @@ export function Board({ user, team }: { user: User; team: User[] }) {
             <Options labels={Object.fromEntries([...labels, ...(filters.label ? [filters.label] : [])].map((l) => [l, l]))} />
           </select>
         )}
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={filters.mentioned === "1"}
+            onChange={(e) => setFilters({ ...filters, mentioned: e.target.checked ? "1" : "" })}
+          />{" "}
+          Mentions me
+        </label>
         <button className="primary" onClick={() => setOpen("new")} aria-keyshortcuts="N" title="New task (N)">
           + New task
         </button>

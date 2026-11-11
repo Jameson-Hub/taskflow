@@ -38,6 +38,7 @@ export interface Comment {
   id: number;
   task_id: number;
   body: string;
+  mentions: number[];
   author: { id: number; name: string };
   created_at: string;
 }
@@ -103,7 +104,7 @@ export const api = {
   deleteTask: (id: number, { keepalive = false } = {}) => request<void>("DELETE", `/tasks/${id}`, undefined, { keepalive }),
 
   comments: (taskId: number) => request<Comment[]>("GET", `/tasks/${taskId}/comments`),
-  addComment: (taskId: number, body: string) => request<Comment>("POST", `/tasks/${taskId}/comments`, { body }),
+  addComment: (taskId: number, body: string, mentions: number[]) => request<Comment>("POST", `/tasks/${taskId}/comments`, { body, mentions }),
   deleteComment: (taskId: number, id: number) => request<void>("DELETE", `/tasks/${taskId}/comments/${id}`),
 
   activity: () => request<ActivityEntry[]>("GET", "/activity"),

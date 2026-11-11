@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Comment, type Priority, type Status, type Task, type User } from "./api";
+import { CommentBox, CommentText } from "./mentions";
 import { Checklist, ErrorText, formatTimestamp, initials, LabelInput, Options, useAction } from "./ui";
 
 interface Props {
@@ -64,15 +65,15 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDel
     });
   }
 
-  function addComment(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const body = String(new FormData(form).get("body"));
-    run(async () => {
-      const created = await api.addComment(task!.id, body);
+  /** Resolves to whether it was saved, so the box keeps the text when it wasn't. */
+  async function addComment(body: string, mentions: number[]) {
+    let saved = false;
+    await run(async () => {
+      const created = await api.addComment(task!.id, body, mentions);
       setComments((all) => [...all, created]);
-      form.reset();
+      saved = true;
     });
+    return saved;
   }
 
   const removeComment = (c: Comment) =>
@@ -180,7 +181,7 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDel
                       {formatTimestamp(c.created_at)}
                     </time>
                   </p>
-                  <p>{c.body}</p>
+                  <CommentText body={c.body} mentions={c.mentions} team={team} />
                 </div>
                 {can.deleteComment(user, c) && (
                   <button className="ghost small" aria-label="Delete comment" onClick={() => removeComment(c)}>
@@ -190,10 +191,7 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDel
               </li>
             ))}
           </ul>
-          <form className="comment-form" onSubmit={addComment}>
-            <input name="body" placeholder="Write a comment…" aria-label="Write a comment" required maxLength={2000} />
-            <button className="primary">Send</button>
-          </form>
+          <CommentBox team={team} onSend={addComment} />
         </section>
       )}
     </dialog>

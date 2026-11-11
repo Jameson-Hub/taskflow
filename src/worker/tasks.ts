@@ -104,7 +104,7 @@ const findTask = (db: D1Database, workspaceId: number, id: number) => selectTask
 export const tasks = new Hono<AppEnv>();
 
 tasks.get("/", async (c) => {
-  const { q, assignee, label, priority: wantedPriority } = c.req.query();
+  const { q, assignee, label, mentioned, priority: wantedPriority } = c.req.query();
   const where = ["t.workspace_id = ?"];
   const params: (string | number)[] = [c.var.user.workspace_id];
   if (q?.trim()) {
@@ -116,6 +116,10 @@ tasks.get("/", async (c) => {
   else if (assignee && /^[0-9]+$/.test(assignee)) {
     where.push("t.assignee_id = ?");
     params.push(Number(assignee));
+  }
+  if (mentioned === "1") {
+    where.push("EXISTS (SELECT 1 FROM comments c, json_each(c.mentions) m WHERE c.task_id = t.id AND m.value = ?)");
+    params.push(c.var.user.id);
   }
   const wantedLabel = label && normalizeLabel(label);
   if (wantedLabel) {
