@@ -34,7 +34,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 | API | Hono, Zod validation |
 | Database | Cloudflare D1 (SQLite), SQL migrations |
 | Frontend | React 19, Vite, plain CSS (light and dark) |
-| Tests | Vitest running inside the Workers runtime, ESLint |
+| Tests | Vitest inside the Workers runtime, Playwright in a real browser, ESLint |
 | CI/CD | GitHub Actions → Wrangler |
 
 ## How it works
@@ -76,14 +76,16 @@ curl -X POST http://localhost:5173/cdn-cgi/handler/scheduled
 npm test          # tests in the Workers runtime against a real local D1
 npm run lint
 npm run typecheck
+npm run test:e2e  # browser tests against the built app
 ```
 
 - **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, search, labels, the dashboard counts, the activity log and the nightly reset.
 - **Unit tests** (`test/unit/`) cover the pure logic on its own: the permission rules and password hashing.
+- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, and joining by invite link. Run them with `npm run test:e2e`; locally they use your installed Chrome.
 
 ## Deployment
 
-Every push runs lint, typecheck, tests and build. Pushes to `main` then apply D1 migrations and deploy. Pull requests get a preview URL.
+Every push runs lint, typecheck, tests, build and the browser tests. Pushes to `main` then apply D1 migrations and deploy, only if all of those pass. Pull requests get a preview URL.
 
 Two things to know:
 

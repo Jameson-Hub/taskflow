@@ -4,3 +4,7 @@ dist/
 .dev.vars
 *.log
 .DS_Store
+
+# Playwright
+playwright-report/
+test-results/
