@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, freshDatabase, loginAs } from "./helpers";
+import { MAX_LABEL_LENGTH, MAX_LABELS } from "../src/shared/domain";
+import { api, freshDatabase, getJson, loginAs, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
 
@@ -138,5 +139,66 @@ describe("search and filters", () => {
 
   it("treats search text literally, not as a pattern", async () => {
     expect(await listTasks(await loginAs("member"), "?q=%25")).toEqual([]);
+  });
+});
+
+describe("labels", () => {
+  type Labelled = Task & { labels: string[] };
+
+  async function create(cookie: string, title: string, labels: string[]) {
+    const res = await api("/api/tasks", { method: "POST", cookie, body: { title, labels } });
+    expect(res.status).toBe(201);
+    return (await res.json()) as Labelled;
+  }
+
+  it("tidies labels: trimmed, lowercase, no repeats", async () => {
+    const task = await create(await loginAs("manager"), "Fix login", [" Bug ", "bug", "Frontend"]);
+    expect(task.labels).toEqual(["bug", "frontend"]);
+  });
+
+  it("can be changed, and the change is logged", async () => {
+    const cookie = await loginAs("manager");
+    const task = await create(cookie, "Fix login", ["bug"]);
+    const res = await api(`/api/tasks/${task.id}`, { method: "PATCH", cookie, body: { labels: ["bug", "urgent"] } });
+    expect(await res.json()).toMatchObject({ labels: ["bug", "urgent"] });
+    const [latest] = await getJson<{ action: string; detail: { changes: object } }[]>("/api/activity", cookie);
+    expect(latest).toMatchObject({ action: "task.updated", detail: { changes: { labels: [["bug"], ["bug", "urgent"]] } } });
+  });
+
+  it("filter the board", async () => {
+    const cookie = await loginAs("manager");
+    await create(cookie, "Fix invoices", ["billing"]);
+    await create(cookie, "Write docs", ["docs"]);
+    expect((await listTasks(cookie, "?label=Billing")).map((t) => t.title)).toEqual(["Fix invoices"]);
+  });
+
+  it("are listed per workspace, for the filter", async () => {
+    const cookie = await loginAs("manager");
+    await create(cookie, "Fix login", ["bug", "auth"]);
+    const ana = sessionCookie(await signUp());
+    await create(ana, "Ana's task", ["secret"]);
+    const labels = await getJson<string[]>("/api/tasks/labels", cookie);
+    expect(labels).toEqual(expect.arrayContaining(["auth", "bug"]));
+    expect(labels).not.toContain("secret");
+    expect(labels).toEqual([...labels].sort());
+  });
+
+  it("are limited in number and length", async () => {
+    const cookie = await loginAs("manager");
+    const tooMany = Array.from({ length: MAX_LABELS + 1 }, (_, i) => `l${i}`);
+    expect((await api("/api/tasks", { method: "POST", cookie, body: { title: "x", labels: tooMany } })).status).toBe(400);
+    expect((await api("/api/tasks", { method: "POST", cookie, body: { title: "x", labels: ["a".repeat(MAX_LABEL_LENGTH + 1)] } })).status).toBe(400);
+  });
+});
+
+describe("the change log", () => {
+  it("records a reassignment from the old assignee to the new one", async () => {
+    const cookie = await loginAs("manager");
+    const [task] = await listTasks(cookie);
+    const team = await getJson<{ id: number }[]>("/api/users", cookie);
+    const next = team.find((u) => u.id !== task!.assignee?.id)!.id;
+    await api(`/api/tasks/${task!.id}`, { method: "PATCH", cookie, body: { assignee_id: next } });
+    const [latest] = await getJson<{ detail: { changes: object } }[]>("/api/activity", cookie);
+    expect(latest!.detail.changes).toEqual({ assignee_id: [task!.assignee?.id ?? null, next] });
   });
 });

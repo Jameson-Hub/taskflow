@@ -7,18 +7,26 @@ const TEAM = [
   { email: "jordan@taskflow.demo", name: "Jordan Tan", role: "member" },
 ] as const;
 
-type SeedTask = { title: string; status: Status; priority: Priority; assignee: number | null; creator: number; dueInDays: number | null };
+type SeedTask = {
+  title: string;
+  status: Status;
+  priority: Priority;
+  assignee: number | null;
+  creator: number;
+  dueInDays: number | null;
+  labels: string[];
+};
 
 // assignee and creator are indexes into TEAM.
 const TASKS: SeedTask[] = [
-  { title: "Set up CI pipeline for the API", status: "done", priority: "high", assignee: 0, creator: 0, dueInDays: null },
-  { title: "Design onboarding flow", status: "in_progress", priority: "high", assignee: 2, creator: 1, dueInDays: 3 },
-  { title: "Write release notes for v1.2", status: "todo", priority: "medium", assignee: 3, creator: 1, dueInDays: 5 },
-  { title: "Fix timezone bug on due dates", status: "in_progress", priority: "high", assignee: 3, creator: 1, dueInDays: 1 },
-  { title: "Audit role permissions", status: "todo", priority: "high", assignee: 0, creator: 0, dueInDays: 7 },
-  { title: "Update dependency versions", status: "todo", priority: "low", assignee: null, creator: 1, dueInDays: null },
-  { title: "Add empty states to the board", status: "todo", priority: "medium", assignee: 2, creator: 2, dueInDays: 10 },
-  { title: "Customer interview notes", status: "done", priority: "low", assignee: 2, creator: 1, dueInDays: null },
+  { title: "Set up CI pipeline for the API", status: "done", priority: "high", assignee: 0, creator: 0, dueInDays: null, labels: ["devops"] },
+  { title: "Design onboarding flow", status: "in_progress", priority: "high", assignee: 2, creator: 1, dueInDays: 3, labels: ["design", "frontend"] },
+  { title: "Write release notes for v1.2", status: "todo", priority: "medium", assignee: 3, creator: 1, dueInDays: 5, labels: ["docs"] },
+  { title: "Fix timezone bug on due dates", status: "in_progress", priority: "high", assignee: 3, creator: 1, dueInDays: 1, labels: ["bug", "frontend"] },
+  { title: "Audit role permissions", status: "todo", priority: "high", assignee: 0, creator: 0, dueInDays: 7, labels: ["security"] },
+  { title: "Update dependency versions", status: "todo", priority: "low", assignee: null, creator: 1, dueInDays: null, labels: ["devops"] },
+  { title: "Add empty states to the board", status: "todo", priority: "medium", assignee: 2, creator: 2, dueInDays: 10, labels: ["design", "frontend"] },
+  { title: "Customer interview notes", status: "done", priority: "low", assignee: 2, creator: 1, dueInDays: null, labels: ["research"] },
 ];
 
 export const DEMO_WORKSPACE = 1;
@@ -39,13 +47,23 @@ export async function resetDemo(db: D1Database) {
         .prepare("INSERT INTO users (email, name, role, is_demo, workspace_id) VALUES (?, ?, ?, 1, ?)")
         .bind(u.email, u.name, u.role, DEMO_WORKSPACE),
     ),
-    ...TASKS.map(({ title, status, priority, assignee, creator, dueInDays }, i) =>
+    ...TASKS.map(({ title, status, priority, assignee, creator, dueInDays, labels }, i) =>
       db
         .prepare(
-          `INSERT INTO tasks (workspace_id, title, status, priority, position, assignee_id, created_by, due_date)
-           VALUES (?, ?, ?, ?, ?, ${userId}, ${userId}, ?)`,
+          `INSERT INTO tasks (workspace_id, title, status, priority, position, assignee_id, created_by, due_date, labels)
+           VALUES (?, ?, ?, ?, ?, ${userId}, ${userId}, ?, ?)`,
         )
-        .bind(DEMO_WORKSPACE, title, status, priority, i + 1, assignee === null ? null : TEAM[assignee]!.email, TEAM[creator]!.email, day(dueInDays)),
+        .bind(
+          DEMO_WORKSPACE,
+          title,
+          status,
+          priority,
+          i + 1,
+          assignee === null ? null : TEAM[assignee]!.email,
+          TEAM[creator]!.email,
+          day(dueInDays),
+          JSON.stringify(labels),
+        ),
     ),
   ]);
 }

@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Comment, type Priority, type Status, type Task, type User } from "./api";
-import { ErrorText, formatTimestamp, initials, Options, useAction } from "./ui";
+import { ErrorText, formatTimestamp, initials, LabelInput, Options, useAction } from "./ui";
 
 interface Props {
   task: Task | null;
   user: User;
   team: User[];
+  labels: string[];
   onClose: () => void;
   onChanged: () => void;
 }
 
-export function TaskDrawer({ task, user, team, onClose, onChanged }: Props) {
+export function TaskDrawer({ task, user, team, labels, onClose, onChanged }: Props) {
   const creating = task === null;
   const editable = creating || can.editTask(user, task);
   const [draft, setDraft] = useState({
@@ -20,6 +21,7 @@ export function TaskDrawer({ task, user, team, onClose, onChanged }: Props) {
     priority: task?.priority ?? ("medium" as Priority),
     due_date: task?.due_date ?? "",
     assignee_id: task?.assignee?.id ?? (creating && user.role === "member" ? user.id : null),
+    labels: task?.labels ?? [],
   });
   const [comments, setComments] = useState<Comment[]>([]);
   const { error, run } = useAction();
@@ -41,8 +43,8 @@ export function TaskDrawer({ task, user, team, onClose, onChanged }: Props) {
         await api.createTask(payload);
       } else {
         const changes = Object.fromEntries(
-          Object.entries(payload).filter(([key, value]) =>
-            key === "assignee_id" ? value !== (task.assignee?.id ?? null) : value !== task[key as keyof Task],
+          Object.entries(payload).filter(
+            ([key, value]) => JSON.stringify(value) !== JSON.stringify(key === "assignee_id" ? (task.assignee?.id ?? null) : task[key as keyof Task]),
           ),
         );
         if (Object.keys(changes).length > 0) await api.updateTask(task.id, changes);
@@ -134,6 +136,11 @@ export function TaskDrawer({ task, user, team, onClose, onChanged }: Props) {
               </select>
             </label>
           </div>
+          {/* htmlFor points at the text box; otherwise a click on the caption would press the first chip's remove button. */}
+          <label htmlFor="label-input">
+            Labels
+            <LabelInput value={draft.labels} known={labels} onChange={(next) => setDraft({ ...draft, labels: next })} />
+          </label>
         </fieldset>
 
         <ErrorText error={error} />

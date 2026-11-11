@@ -30,6 +30,7 @@ export interface Task {
   created_by: number;
   created_at: string;
   updated_at: string;
+  labels: string[];
 }
 
 export interface Comment {
@@ -91,6 +92,7 @@ export const api = {
     const query = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== "")).toString();
     return request<Task[]>("GET", `/tasks${query ? `?${query}` : ""}`);
   },
+  labels: () => request<string[]>("GET", "/tasks/labels"),
   createTask: (task: Partial<Task> & { assignee_id?: number | null }) => request<Task>("POST", "/tasks", task),
   updateTask: (id: number, changes: Partial<Omit<Task, "assignee">> & { assignee_id?: number | null }) =>
     request<Task>("PATCH", `/tasks/${id}`, changes),

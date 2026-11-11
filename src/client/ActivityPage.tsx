@@ -31,6 +31,7 @@ function describe(entry: ActivityEntry, names: Map<number, string>) {
         if (field === "status") return `moved it to ${STATUS_LABEL[to as Status]}`;
         if (field === "assignee_id") return to === null ? "unassigned it" : `assigned it to ${names.get(to as number) ?? "someone"}`;
         if (field === "priority") return `set priority to ${to}`;
+        if (field === "labels") return (to as string[]).length ? `set labels to ${(to as string[]).join(", ")}` : "removed its labels";
         return `changed the ${FIELD_LABEL[field] ?? field}`;
       });
       return `updated ${title}: ${parts.join(", ")}`;

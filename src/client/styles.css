@@ -300,6 +300,60 @@ label.check input {
   font-size: 0.8rem;
 }
 
+/* Labels: colour comes from --hue, set per label name. */
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: hsl(var(--hue) 70% 24%);
+  background: hsl(var(--hue) 80% 92%);
+}
+
+.label-chip button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .label-chip {
+    color: hsl(var(--hue) 80% 80%);
+    background: hsl(var(--hue) 40% 22%);
+  }
+}
+
+.card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.label-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.label-input input {
+  flex: 1;
+  min-width: 8rem;
+  border: 0;
+  padding: 0.15rem;
+  background: transparent;
+}
+
 /* Honeypot: off-screen rather than display:none, which some bots skip. */
 .trap {
   position: absolute;

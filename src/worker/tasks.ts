@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { PRIORITIES, STATUSES, type Priority, type Status } from "../shared/domain";
+import { MAX_LABEL_LENGTH, MAX_LABELS, normalizeLabel, PRIORITIES, STATUSES, type Priority, type Status } from "../shared/domain";
 import { can } from "../shared/policy";
 import { JUST_INSERTED, logActivity } from "./activity";
 import { fail, orNotFound, idParam, readBody, requirePolicy, type AppEnv } from "./http";
@@ -18,17 +18,27 @@ type TaskRow = {
   created_by: number;
   created_at: string;
   updated_at: string;
+  /** JSON array; parsed by toTask. */
+  labels: string;
 };
 
 const SELECT_TASK = `SELECT t.*, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id`;
 
-function toTask({ assignee_id, assignee_name, ...rest }: TaskRow) {
-  return { ...rest, assignee: assignee_id === null ? null : { id: assignee_id, name: assignee_name } };
+// labels is stored as JSON text; every other field is stored as is. All reads and writes go through these.
+const encode = (field: string, value: unknown) => (field === "labels" ? JSON.stringify(value) : (value ?? null));
+const decode = (field: string, value: unknown) => (field === "labels" ? (JSON.parse(value as string) as unknown) : value);
+
+function toTask({ assignee_id, assignee_name, labels, ...rest }: TaskRow) {
+  return { ...rest, labels: decode("labels", labels) as string[], assignee: assignee_id === null ? null : { id: assignee_id, name: assignee_name } };
 }
 
 const status = z.enum(STATUSES);
 const priority = z.enum(PRIORITIES);
 const dueDate = z.iso.date().nullable();
+const labels = z
+  .array(z.string().transform(normalizeLabel).pipe(z.string().min(1).max(MAX_LABEL_LENGTH)))
+  .max(MAX_LABELS)
+  .transform((all) => [...new Set(all)]);
 
 const newTask = z.object({
   title: z.string().trim().min(1).max(200),
@@ -37,6 +47,7 @@ const newTask = z.object({
   priority: priority.default("medium"),
   due_date: dueDate.default(null),
   assignee_id: z.number().int().nullable().default(null),
+  labels: labels.default([]),
 });
 
 const taskPatch = z
@@ -48,6 +59,7 @@ const taskPatch = z
     due_date: dueDate,
     assignee_id: z.number().int().nullable(),
     position: z.number().finite(),
+    labels,
   })
   .partial();
 
@@ -65,7 +77,7 @@ const findTask = (db: D1Database, workspaceId: number, id: number) => selectTask
 export const tasks = new Hono<AppEnv>();
 
 tasks.get("/", async (c) => {
-  const { q, assignee, priority: wantedPriority } = c.req.query();
+  const { q, assignee, label, priority: wantedPriority } = c.req.query();
   const where = ["t.workspace_id = ?"];
   const params: (string | number)[] = [c.var.user.workspace_id];
   if (q?.trim()) {
@@ -77,6 +89,11 @@ tasks.get("/", async (c) => {
   else if (assignee && /^[0-9]+$/.test(assignee)) {
     where.push("t.assignee_id = ?");
     params.push(Number(assignee));
+  }
+  const wantedLabel = label && normalizeLabel(label);
+  if (wantedLabel) {
+    where.push("EXISTS (SELECT 1 FROM json_each(t.labels) WHERE value = ?)");
+    params.push(wantedLabel);
   }
   if (priority.safeParse(wantedPriority).success) {
     where.push("t.priority = ?");
@@ -90,6 +107,16 @@ tasks.get("/", async (c) => {
   return c.json(results.map(toTask));
 });
 
+/** Every label in use in the workspace, for the board's filter. */
+tasks.get("/labels", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    "SELECT DISTINCT j.value AS name FROM tasks t, json_each(t.labels) j WHERE t.workspace_id = ? ORDER BY name",
+  )
+    .bind(c.var.user.workspace_id)
+    .all<{ name: string }>();
+  return c.json(results.map((r) => r.name));
+});
+
 tasks.post("/", async (c) => {
   const t = await readBody(c, newTask, "A task needs a title");
   const user = c.var.user;
@@ -99,9 +126,21 @@ tasks.post("/", async (c) => {
   // One atomic batch. The SELECT runs before the activity insert, which would move last_insert_rowid().
   const [, created] = await c.env.DB.batch<TaskRow>([
     c.env.DB.prepare(
-      `INSERT INTO tasks (workspace_id, title, description, status, priority, due_date, assignee_id, created_by, position)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM tasks WHERE workspace_id = ? AND status = ?))`,
-    ).bind(user.workspace_id, t.title, t.description, t.status, t.priority, t.due_date, t.assignee_id, user.id, user.workspace_id, t.status),
+      `INSERT INTO tasks (workspace_id, title, description, status, priority, due_date, assignee_id, labels, created_by, position)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM tasks WHERE workspace_id = ? AND status = ?))`,
+    ).bind(
+      user.workspace_id,
+      t.title,
+      t.description,
+      t.status,
+      t.priority,
+      t.due_date,
+      t.assignee_id,
+      encode("labels", t.labels),
+      user.id,
+      user.workspace_id,
+      t.status,
+    ),
     c.env.DB.prepare(`${SELECT_TASK} WHERE t.id = last_insert_rowid()`),
     logActivity(c.env.DB, user, JUST_INSERTED, "task.created", { title: t.title }),
   ]);
@@ -123,11 +162,11 @@ tasks.patch("/:id{[0-9]+}", async (c) => {
 
   const update = c.env.DB.prepare(
     `UPDATE tasks SET ${fields.map((f) => `${f} = ?`).join(", ")}, updated_at = datetime('now') WHERE id = ?`,
-  ).bind(...fields.map((f) => changes[f] ?? null), task.id);
+  ).bind(...fields.map((f) => encode(f, changes[f])), task.id);
 
-  // Reordering alone is noise in the log; only real edits are recorded.
+  // Compared in stored form; reordering alone is noise in the log, so only real edits are recorded.
   const changed = Object.fromEntries(
-    fields.filter((f) => f !== "position" && changes[f] !== task[f]).map((f) => [f, [task[f], changes[f]]]),
+    fields.filter((f) => f !== "position" && encode(f, changes[f]) !== task[f]).map((f) => [f, [decode(f, task[f]), changes[f]]]),
   );
   const log = Object.keys(changed).length
     ? [logActivity(c.env.DB, user, task.id, "task.updated", { title: changes.title ?? task.title, changes: changed })]

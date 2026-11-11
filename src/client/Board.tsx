@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type DragEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Status, type Task, type User } from "./api";
 import { TaskDrawer } from "./TaskDrawer";
 import { DAY_MS, STATUSES } from "../shared/domain";
-import { ErrorText, initials, Options, useAction } from "./ui";
+import { ErrorText, initials, LabelChip, Options, useAction } from "./ui";
 
 /** Position that slots a card between its new neighbours without renumbering the column. */
 function positionBetween(before?: Task, after?: Task) {
@@ -25,13 +25,20 @@ function dueLabel(date: string) {
 
 export function Board({ user, team }: { user: User; team: User[] }) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [filters, setFilters] = useState({ q: "", assignee: "", priority: "" });
+  const [filters, setFilters] = useState({ q: "", assignee: "", priority: "", label: "" });
+  const [labels, setLabels] = useState<string[]>([]);
   const [open, setOpen] = useState<Task | "new" | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<{ status: Status; index: number } | null>(null);
   const { error, setError, run } = useAction();
 
   const load = useCallback(() => run(() => api.tasks(filters).then(setTasks)), [filters, run]);
+  // Filtering never changes which labels exist, so these load on open and after a save only.
+  const loadLabels = useCallback(() => run(() => api.labels().then(setLabels)), [run]);
+
+  useEffect(() => {
+    loadLabels();
+  }, [loadLabels]);
 
   useEffect(() => {
     const timer = setTimeout(load, filters.q ? 250 : 0);
@@ -99,6 +106,13 @@ export function Board({ user, team }: { user: User; team: User[] }) {
           <option value="">Any priority</option>
           <Options labels={PRIORITY_LABEL} />
         </select>
+        {(labels.length > 0 || filters.label) && (
+          <select aria-label="Label" value={filters.label} onChange={(e) => setFilters({ ...filters, label: e.target.value })}>
+            <option value="">Any label</option>
+            {/* Keep the chosen label selectable even after its last task drops it, so the filter can be cleared. */}
+            <Options labels={Object.fromEntries([...labels, ...(filters.label ? [filters.label] : [])].map((l) => [l, l]))} />
+          </select>
+        )}
         <button className="primary" onClick={() => setOpen("new")}>
           + New task
         </button>
@@ -151,6 +165,13 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                     >
                       <button className="card-body" onClick={() => setOpen(task)}>
                         <span className="card-title">{task.title}</span>
+                        {task.labels.length > 0 && (
+                          <span className="card-labels">
+                            {task.labels.map((l) => (
+                              <LabelChip key={l} name={l} />
+                            ))}
+                          </span>
+                        )}
                         <span className="card-meta">
                           <span className={`priority priority-${task.priority}`}>{task.priority}</span>
                           {due && <span className={`due ${due.tone}`}>{due.text}</span>}
@@ -182,8 +203,12 @@ export function Board({ user, team }: { user: User; team: User[] }) {
           task={open === "new" ? null : open}
           user={user}
           team={team}
+          labels={labels}
           onClose={() => setOpen(null)}
-          onChanged={load}
+          onChanged={() => {
+            load();
+            loadLabels();
+          }}
         />
       )}
     </div>
