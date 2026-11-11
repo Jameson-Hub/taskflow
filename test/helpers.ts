@@ -54,8 +54,13 @@ export async function signUp(details: Partial<typeof ana> & { website?: string }
   return api("/api/auth/signup", { method: "POST", body: { ...ana, ...details }, ip });
 }
 
-export async function loginWithPassword(email = ana.email, password = ana.password, ip?: string) {
-  return api("/api/auth/login", { method: "POST", body: { email, password }, ip });
+export async function loginWithPassword({
+  email = ana.email,
+  password = ana.password,
+  ip,
+  remember,
+}: { email?: string; password?: string; ip?: string; remember?: boolean } = {}) {
+  return api("/api/auth/login", { method: "POST", body: { email, password, remember }, ip });
 }
 
 export async function getJson<T>(path: string, cookie: string) {

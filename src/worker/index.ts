@@ -7,7 +7,7 @@ import { comments } from "./comments";
 import { fail, readBody, type AppEnv } from "./http";
 import { hashPassword, verifyPassword } from "./password";
 import { DEMO_WORKSPACE, deleteInactiveWorkspaces, resetDemo } from "./seed";
-import { endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
+import { deleteExpiredSessions, endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
 import { tasks } from "./tasks";
 import { newUser, roleBody, users } from "./users";
 
@@ -57,7 +57,7 @@ app.post("/auth/demo", async (c) => {
     user = await findDemo();
   }
   if (!user) fail(503, "Demo account missing");
-  await startSession(c, c.env.DB, user.id);
+  await startSession(c, c.env.DB, user.id, "standard");
   return c.json(publicUser(user));
 });
 
@@ -84,14 +84,14 @@ app.post("/auth/signup", rateLimited, async (c) => {
     if (String(err).includes("UNIQUE")) fail(409, "That email is already registered. Sign in instead.");
     throw err;
   }
-  await startSession(c, c.env.DB, user.id);
+  await startSession(c, c.env.DB, user.id, "standard");
   return c.json(publicUser(user), 201);
 });
 
 app.post("/auth/login", rateLimited, async (c) => {
-  const { email, password } = await readBody(
+  const { email, password, remember } = await readBody(
     c,
-    z.object({ email: z.string(), password: z.string() }),
+    z.object({ email: z.string(), password: z.string(), remember: z.boolean().optional() }),
     "Email and password are required",
   );
   const user = await c.env.DB.prepare(`${SELECT_USER_WITH_PASSWORD} WHERE u.email = ?`)
@@ -99,7 +99,7 @@ app.post("/auth/login", rateLimited, async (c) => {
     .first<User & { password_hash: string | null }>();
   const valid = await verifyPassword(password, user?.password_hash ?? null);
   if (!valid || !user) fail(401, "Wrong email or password");
-  await startSession(c, c.env.DB, user.id);
+  await startSession(c, c.env.DB, user.id, remember ? "remembered" : "browser");
   return c.json(publicUser(user));
 });
 
@@ -120,6 +120,6 @@ app.route("/activity", activity);
 export default {
   fetch: app.fetch,
   async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(Promise.all([resetDemo(env.DB), deleteInactiveWorkspaces(env.DB)]));
+    ctx.waitUntil(Promise.all([resetDemo(env.DB), deleteInactiveWorkspaces(env.DB), deleteExpiredSessions(env.DB)]));
   },
 } satisfies ExportedHandler<Env>;

@@ -78,7 +78,7 @@ describe("nightly job", () => {
     await runNightlyReset();
 
     expect((await loginWithPassword()).status).toBe(401);
-    expect((await loginWithPassword("active@example.com")).status).toBe(200);
+    expect((await loginWithPassword({ email: "active@example.com" })).status).toBe(200);
     const count = async (sql: string) => (await env.DB.prepare(sql).first<{ n: number }>())?.n;
     // Ana's workspace is gone without a trace.
     expect(await count("SELECT COUNT(*) AS n FROM tasks WHERE title = 'Ana''s private task'")).toBe(0);
@@ -89,6 +89,19 @@ describe("nightly job", () => {
     expect(await getJson("/api/tasks", active)).toMatchObject([{ title: "Busy task" }]);
     expect(await count("SELECT COUNT(*) AS n FROM activity WHERE detail LIKE '%Busy task%'")).toBe(1);
     expect((await getJson<unknown[]>("/api/tasks", await loginAs("member"))).length).toBe(8);
+  });
+
+  it("clears out expired sessions and keeps live ones", async () => {
+    const expired = sessionCookie(await signUp());
+    await env.DB.prepare("UPDATE sessions SET expires_at = '2020-01-01T00:00:00.000Z'").run();
+    const fresh = sessionCookie(await loginWithPassword());
+
+    await runNightlyReset();
+
+    const sessions = await env.DB.prepare("SELECT COUNT(*) AS n FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email = 'ana@example.com'").first<{ n: number }>();
+    expect(sessions?.n).toBe(1);
+    expect((await api("/api/me", { cookie: fresh })).status).toBe(200);
+    expect((await api("/api/me", { cookie: expired })).status).toBe(401);
   });
 });
 
@@ -112,7 +125,7 @@ describe("rate limiting", () => {
   // Ten attempts a minute get their normal answer; the eleventh is refused.
   it.each([
     ["sign-ups", (i: number) => signUp({ email: `bot${i}@example.com` }, "203.0.113.10"), 201],
-    ["logins", () => loginWithPassword("x@example.com", "nope", "203.0.113.9"), 401],
+    ["logins", () => loginWithPassword({ email: "x@example.com", password: "nope", ip: "203.0.113.9" }), 401],
   ] as const)("blocks rapid repeated %s from one address", async (_, attempt, normal) => {
     const statuses = [];
     for (let i = 0; i < 11; i++) statuses.push((await attempt(i)).status);

@@ -42,7 +42,7 @@ Browser ──► Worker ─┬─ /api/*  → Hono routes → D1
           Cron 00:00 UTC ──► reset demo workspace, delete inactive ones
 ```
 
-- **Sessions:** a random 256-bit token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Only its SHA-256 hash is stored, so a leaked table can't be used to sign in. Logout deletes the row.
+- **Sessions:** a random 256-bit token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Only its SHA-256 hash is stored, so a leaked table can't be used to sign in. Logout deletes the row. "Remember me" keeps a login for 30 days; without it the cookie ends with the browser and the server expires it within a day.
 - **Passwords:** PBKDF2-SHA256 with a per-user salt, compared in constant time. Unknown emails still run a hash, so timing doesn't reveal which accounts exist.
 - **CSRF:** every non-GET request must carry an `Origin` header matching the app.
 - **Multi-tenancy:** every query is scoped to the caller's workspace, so another workspace's data reads as "not found". Tests prove each endpoint stays inside its workspace.

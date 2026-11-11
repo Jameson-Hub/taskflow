@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityPage } from "./ActivityPage";
-import { api, can, ROLE_LABEL, type User } from "./api";
+import { api, can, ROLE_LABEL, whenSessionExpires, type User } from "./api";
 import { Board } from "./Board";
 import { Login } from "./Login";
 import { TeamPage } from "./TeamPage";
@@ -19,6 +19,7 @@ export function App() {
 
   useEffect(() => {
     api.me().then(setUser, () => setUser(null));
+    whenSessionExpires(() => setUser(null));
     const onHash = () => setPage(pageFromHash());
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);

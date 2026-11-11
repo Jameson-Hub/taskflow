@@ -276,6 +276,19 @@ fieldset {
   gap: 0.8rem;
 }
 
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+}
+
+label.check input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 /* Honeypot: off-screen rather than display:none, which some bots skip. */
 .trap {
   position: absolute;

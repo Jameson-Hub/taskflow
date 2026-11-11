@@ -3,7 +3,18 @@ import type { Context } from "hono";
 import { DAY_MS, type Role } from "../shared/domain";
 
 export const SESSION_COOKIE = "sid";
-const SESSION_DAYS = 7;
+
+/**
+ * How long a sign-in lasts. `persistent` cookies survive a browser restart; a "browser"
+ * session's cookie doesn't, and the server also expires it within a day.
+ * standard: demo and sign-up · remembered/browser: password login with or without "Remember me".
+ */
+const SESSION_LENGTHS = {
+  standard: { days: 7, persistent: true },
+  remembered: { days: 30, persistent: true },
+  browser: { days: 1, persistent: false },
+};
+export type SessionLength = keyof typeof SESSION_LENGTHS;
 
 export interface User {
   id: number;
@@ -33,9 +44,10 @@ async function sha256(value: string) {
   return toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
 }
 
-export async function startSession(c: Context, db: D1Database, userId: number) {
+export async function startSession(c: Context, db: D1Database, userId: number, length: SessionLength) {
+  const { days, persistent } = SESSION_LENGTHS[length];
   const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
-  const expires = new Date(Date.now() + SESSION_DAYS * DAY_MS);
+  const expires = new Date(Date.now() + days * DAY_MS);
   await db
     .prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
     .bind(await sha256(token), userId, expires.toISOString())
@@ -45,7 +57,7 @@ export async function startSession(c: Context, db: D1Database, userId: number) {
     secure: true,
     sameSite: "Lax",
     path: "/",
-    expires,
+    ...(persistent && { expires }),
   });
 }
 
@@ -63,6 +75,11 @@ export function touchLastSeen(db: D1Database, user: User) {
   const today = new Date().toISOString().slice(0, 10);
   if (user.last_seen_at?.startsWith(today)) return null;
   return db.prepare("UPDATE users SET last_seen_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
+}
+
+/** Nightly: expired sessions already fail sign-in checks; this just stops them piling up. */
+export async function deleteExpiredSessions(db: D1Database) {
+  await db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(new Date().toISOString()).run();
 }
 
 export async function endSession(c: Context, db: D1Database) {

@@ -43,12 +43,21 @@ export interface ActivityEntry {
   created_at: string;
 }
 
+let onSessionExpired = () => {};
+
+/** Called when a signed-in request comes back 401, e.g. a session that ran out while the tab was open. */
+export function whenSessionExpires(handler: () => void) {
+  onSessionExpired = handler;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  // Sign-in routes answer 401 for a wrong password, not an expired session.
+  if (res.status === 401 && !path.startsWith("/auth/")) onSessionExpired();
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { error?: string }).error ?? "Something went wrong");
@@ -58,7 +67,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   me: () => request<User>("GET", "/me"),
   demoLogin: (role: Role) => request<User>("POST", "/auth/demo", { role }),
-  login: (email: string, password: string) => request<User>("POST", "/auth/login", { email, password }),
+  login: (email: string, password: string, remember: boolean) => request<User>("POST", "/auth/login", { email, password, remember }),
   signup: (details: { name: string; email: string; password: string; workspace: string; website: string }) =>
     request<User>("POST", "/auth/signup", details),
   logout: () => request("POST", "/auth/logout"),

@@ -35,7 +35,7 @@ export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
   function submitSignIn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    signIn(() => api.login(String(form.get("email")), String(form.get("password"))));
+    signIn(() => api.login(String(form.get("email")), String(form.get("password")), form.has("remember")));
   }
 
   function submitSignUp(e: FormEvent<HTMLFormElement>) {
@@ -90,6 +90,9 @@ export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
             <label>
               Password
               <input name="password" type="password" autoComplete="current-password" required />
+            </label>
+            <label className="check">
+              <input name="remember" type="checkbox" /> Remember me for 30 days
             </label>
             <button className="primary" disabled={busy}>
               Sign in
