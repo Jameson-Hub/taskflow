@@ -58,9 +58,10 @@ export function whenSessionExpires(handler: () => void) {
   onSessionExpired = handler;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, { keepalive = false } = {}): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
+    keepalive,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -98,7 +99,8 @@ export const api = {
   createTask: (task: Partial<Task> & { assignee_id?: number | null }) => request<Task>("POST", "/tasks", task),
   updateTask: (id: number, changes: Partial<Omit<Task, "assignee">> & { assignee_id?: number | null }) =>
     request<Task>("PATCH", `/tasks/${id}`, changes),
-  deleteTask: (id: number) => request<void>("DELETE", `/tasks/${id}`),
+  /** `keepalive` lets the request finish while the page is closing. */
+  deleteTask: (id: number, { keepalive = false } = {}) => request<void>("DELETE", `/tasks/${id}`, undefined, { keepalive }),
 
   comments: (taskId: number) => request<Comment[]>("GET", `/tasks/${taskId}/comments`),
   addComment: (taskId: number, body: string) => request<Comment>("POST", `/tasks/${taskId}/comments`, { body }),

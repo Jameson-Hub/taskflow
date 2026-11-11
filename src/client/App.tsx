@@ -6,6 +6,7 @@ import { Board } from "./Board";
 import { DashboardPage } from "./DashboardPage";
 import { Login } from "./Login";
 import { TeamPage } from "./TeamPage";
+import { settleBeforeSignOut } from "./signOut";
 import { parseHash } from "./ui";
 
 const PAGES = ["board", "dashboard", "activity", "team", "account"] as const;
@@ -96,6 +97,7 @@ export function App() {
   }
 
   async function signOut() {
+    await settleBeforeSignOut();
     await api.logout();
     clearUser();
   }

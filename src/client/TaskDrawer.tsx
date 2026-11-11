@@ -9,9 +9,11 @@ interface Props {
   labels: string[];
   onClose: () => void;
   onChanged: () => void;
+  /** The board removes it, with a few seconds to undo. */
+  onDelete: (task: Task) => void;
 }
 
-export function TaskDrawer({ task, user, team, labels, onClose, onChanged }: Props) {
+export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDelete }: Props) {
   const creating = task === null;
   const editable = creating || can.editTask(user, task);
   const [initial] = useState(() => ({
@@ -61,13 +63,6 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged }: Pro
       onClose();
     });
   }
-
-  const remove = () =>
-    run(async () => {
-      await api.deleteTask(task!.id);
-      onChanged();
-      onClose();
-    });
 
   function addComment(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -162,7 +157,7 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged }: Pro
 
         <div className="actions">
           {!creating && can.deleteTask(user) && (
-            <button type="button" className="danger" onClick={remove}>
+            <button type="button" className="danger" onClick={() => onDelete(task!)}>
               Delete
             </button>
           )}

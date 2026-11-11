@@ -7,6 +7,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 ## Features
 
 - **Kanban board** with drag and drop between and within columns, updating live when anyone in the workspace changes something
+- **Undo delete:** a deleted task disappears at once but can be restored for 10 seconds, comments and history intact
 - **Keyboard support:** Alt/Option + arrow keys move a focused card (announced to screen readers), N opens a new task, / jumps to search
 - **Three roles**, enforced on the server:
 
@@ -85,7 +86,7 @@ npm run test:e2e  # browser tests against the built app
 
 - **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, search, labels, checklists, the dashboard counts, live updates, the activity log and the nightly reset.
 - **Unit tests** (`test/unit/`) cover the pure logic on its own: the permission rules, password hashing and where a moved card lands.
-- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, and joining by invite link. Run them with `npm run test:e2e`; locally they use your installed Chrome.
+- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, and joining by invite link. Run them with `npm run test:e2e`; locally they use your installed Chrome.
 
 ## Deployment
 

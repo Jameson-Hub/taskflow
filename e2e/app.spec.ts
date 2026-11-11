@@ -102,3 +102,39 @@ test("the board works from the keyboard: shortcuts, and moving a card without a 
   await page.keyboard.press("/");
   await expect(page.getByLabel("Search tasks")).toBeFocused();
 });
+
+test("a deleted task can be undone for a few seconds, then it's gone for good", async ({ page }) => {
+  await page.clock.install();
+  await signUp(page, `Undo ${unique()}`);
+  const todo = page.getByRole("region", { name: "To do" });
+  const add = async (title: string) => {
+    await page.getByRole("button", { name: "+ New task" }).click();
+    await page.getByLabel("Title").fill(title);
+    await page.getByRole("button", { name: "Create task" }).click();
+    await expect(todo.getByText(title)).toBeVisible();
+  };
+  const remove = async (title: string) => {
+    await todo.getByText(title).click();
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(todo.getByText(title)).toHaveCount(0);
+  };
+
+  const undo = page.getByRole("status").getByRole("button", { name: "Undo" });
+
+  await add("Changed my mind");
+  await remove("Changed my mind");
+  await undo.click();
+  await expect(todo.getByText("Changed my mind")).toBeVisible();
+  // Undone means kept: nothing is sent when the window would have run out.
+  await page.clock.fastForward(11_000);
+  await page.reload();
+  await expect(todo.getByText("Changed my mind")).toBeVisible();
+
+  await remove("Changed my mind");
+  const deleted = page.waitForResponse((r) => r.request().method() === "DELETE");
+  await page.clock.fastForward(11_000);
+  await deleted;
+  await expect(undo).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText("Your board is empty")).toBeVisible();
+});

@@ -625,6 +625,28 @@ a.bar-row:focus-visible {
   color: var(--muted);
 }
 
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+
+.toast button {
+  color: inherit;
+  font-weight: 600;
+}
+
 /* Honeypot: off-screen rather than display:none, which some bots skip. */
 .trap {
   position: absolute;

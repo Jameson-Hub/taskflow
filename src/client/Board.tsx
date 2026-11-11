@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Status, type Task, type User } from "./api";
 import { onBoardChange } from "./live";
+import { beforeSignOut } from "./signOut";
 import { byBoardOrder, columnOf, keyboardMove, placeAt, type Direction } from "../shared/moves";
 import { TaskDrawer } from "./TaskDrawer";
 import { STATUSES } from "../shared/domain";
 import { checklistProgress, dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
 
+const UNDO_MS = 10_000;
 const ARROWS: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
 
 export function Board({ user, team }: { user: User; team: User[] }) {
@@ -26,13 +28,17 @@ export function Board({ user, team }: { user: User; team: User[] }) {
   const [dragging, setDragging] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<{ status: Status; index: number } | null>(null);
   const { error, setError, run } = useAction();
+  // Deleting waits UNDO_MS before reaching the server, so it can be undone with comments and history intact.
+  const pendingDelete = useRef<{ task: Task; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const [undoTask, setUndoTask] = useState<Task | null>(null);
 
   // A linked task opens once, on the first load that has it; cleared so later reloads don't reopen it.
   const linkedTask = useRef(Number(linked.get("task")) || null);
   const load = useCallback(
     () =>
       run(async () => {
-        const list = await api.tasks(filters);
+        // A task waiting out its undo window is gone as far as this board is concerned.
+        const list = (await api.tasks(filters)).filter((t) => t.id !== pendingDelete.current?.task.id);
         setTasks(list);
         const wanted = linkedTask.current;
         if (wanted === null) return;
@@ -45,6 +51,59 @@ export function Board({ user, team }: { user: User; team: User[] }) {
   );
   // Filtering never changes which labels exist, so these load on open and after a save only.
   const loadLabels = useCallback(() => run(() => api.labels().then(setLabels)), [run]);
+
+  /** Ends the undo window and hands back the task that was waiting, if any. */
+  function takePending() {
+    const pending = pendingDelete.current;
+    if (!pending) return null;
+    clearTimeout(pending.timer);
+    pendingDelete.current = null;
+    setUndoTask(null);
+    return pending;
+  }
+
+  // The undo timer outlives renders, so it reloads through this to use the current filters.
+  const latestLoad = useRef(load);
+  useEffect(() => {
+    latestLoad.current = load;
+  }, [load]);
+
+  function commitDelete(keepalive = false) {
+    const pending = takePending();
+    if (!pending) return Promise.resolve();
+    return run(() =>
+      api.deleteTask(pending.task.id, { keepalive }).catch((err) => {
+        latestLoad.current(); // put it back if the server refused
+        throw err;
+      }),
+    );
+  }
+
+  function deleteWithUndo(task: Task) {
+    commitDelete(); // one undo at a time: an earlier pending delete goes through now
+    setOpen(null);
+    setTasks((all) => all.filter((t) => t.id !== task.id));
+    pendingDelete.current = { task, timer: setTimeout(() => commitDelete(), UNDO_MS) };
+    setUndoTask(task);
+  }
+
+  function undoDelete() {
+    // A fresh load rather than the old copy: someone may have edited it, or the filters changed, meanwhile.
+    if (takePending()) latestLoad.current();
+  }
+
+  // Leaving the board or closing the tab doesn't cancel a delete: it's sent straight away.
+  const flushDelete = useEffectEvent(() => commitDelete(true));
+  useEffect(() => {
+    const flush = () => flushDelete();
+    addEventListener("pagehide", flush);
+    const unregister = beforeSignOut(flush); // signing out ends the session the delete needs
+    return () => {
+      removeEventListener("pagehide", flush);
+      unregister();
+      flush();
+    };
+  }, []);
 
   useEffect(() => {
     loadLabels();
@@ -295,8 +354,21 @@ export function Board({ user, team }: { user: User; team: User[] }) {
             load();
             loadLabels();
           }}
+          onDelete={deleteWithUndo}
         />
       )}
+
+      {/* Always in the page, so screen readers announce the message when it appears. */}
+      <div className={undoTask ? "toast" : "sr-only"} role="status">
+        {undoTask && (
+          <>
+            Deleted "{undoTask.title}".
+            <button className="ghost" onClick={undoDelete}>
+              Undo
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
