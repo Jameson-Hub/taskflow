@@ -10,28 +10,22 @@ const DEMOS: { role: Role; blurb: string }[] = [
 
 type Mode = "demo" | "signin" | "signup" | "join";
 
-/** Invite links look like `/#invite=<token>`; a fragment is never sent to the server. */
-export const inviteToken = () => new URLSearchParams(location.hash.slice(1)).get("invite");
-
 const MODES: { mode: Mode; label: string }[] = [
   { mode: "demo", label: "Try the demo" },
   { mode: "signin", label: "Sign in" },
   { mode: "signup", label: "Create account" },
 ];
 
-export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
+/** `inviteToken` comes from App, which owns the invite link; it's null when the page wasn't opened from one. */
+export function Login({ inviteToken, onSignedIn }: { inviteToken: string | null; onSignedIn: (user: User) => void }) {
   const { error, setError, run } = useAction();
   const [busy, setBusy] = useState(false);
-  const [token] = useState(inviteToken);
-  const [mode, setMode] = useState<Mode>(token ? "join" : "demo");
+  const [mode, setMode] = useState<Mode>(inviteToken ? "join" : "demo");
   const [invite, setInvite] = useState<Invite | null>(null);
 
   useEffect(() => {
-    if (!token) return;
-    // Out of the address bar and history straight away, whether or not they join.
-    history.replaceState(null, "", location.pathname);
-    run(async () => setInvite(await api.invite(token)));
-  }, [token, run]);
+    if (inviteToken) run(async () => setInvite(await api.invite(inviteToken)));
+  }, [inviteToken, run]);
 
   async function signIn(attempt: () => Promise<User>) {
     setBusy(true);
@@ -55,7 +49,7 @@ export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
     const form = new FormData(e.currentTarget);
     signIn(() =>
       api.join({
-        token: token ?? "",
+        token: inviteToken ?? "",
         name: String(form.get("name")),
         email: String(form.get("email")),
         password: String(form.get("password")),

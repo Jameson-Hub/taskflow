@@ -4,7 +4,7 @@ import { ActivityPage } from "./ActivityPage";
 import { api, can, ROLE_LABEL, whenSessionExpires, type User } from "./api";
 import { Board } from "./Board";
 import { DashboardPage } from "./DashboardPage";
-import { inviteToken, Login } from "./Login";
+import { Login } from "./Login";
 import { TeamPage } from "./TeamPage";
 import { parseHash } from "./ui";
 
@@ -16,17 +16,30 @@ const pageFromHash = (): Page => {
   return PAGES.find((p) => p === page) ?? "board";
 };
 
+/** Invite links look like `/#invite=<token>`; a fragment is never sent to the server. */
+const readInviteToken = () => new URLSearchParams(location.hash.slice(1)).get("invite");
+
 export function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [team, setTeam] = useState<User[]>([]);
   const [page, setPage] = useState<Page>(pageFromHash);
-  // An invite link opened while signed in: offer to sign out and join rather than ignore it.
-  const [invitePending, setInvitePending] = useState(() => inviteToken() !== null);
+  // The one owner of an opened invite link: Login uses it to join, and it's dropped once someone signs in.
+  const [inviteToken, setInviteToken] = useState(readInviteToken);
+
+  // Out of the address bar and history straight away, whether or not they join.
+  useEffect(() => {
+    if (inviteToken) history.replaceState(null, "", location.pathname);
+  }, [inviteToken]);
 
   useEffect(() => {
     api.me().then(setUser, () => setUser(null));
     whenSessionExpires(() => setUser(null));
-    const onHash = () => setPage(pageFromHash());
+    const onHash = () => {
+      // Also catches an invite link pasted into a tab that's already open.
+      const pasted = readInviteToken();
+      if (pasted) setInviteToken(pasted);
+      setPage(pageFromHash());
+    };
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
   }, []);
@@ -38,16 +51,18 @@ export function App() {
   }, [userId]);
 
   if (user === undefined) return <div className="splash" aria-busy="true" />;
-  if (user === null) return <Login onSignedIn={setUser} />;
-  if (invitePending) {
-    const dismiss = () => {
-      history.replaceState(null, "", location.pathname);
-      setInvitePending(false);
+  if (user === null) {
+    const signedIn = (u: User) => {
+      setInviteToken(null);
+      setUser(u);
     };
+    // Keyed by the invite, so a link pasted while on this screen opens the join form.
+    return <Login key={inviteToken ?? "none"} inviteToken={inviteToken} onSignedIn={signedIn} />;
+  }
+  if (inviteToken) {
     const signOutAndJoin = async () => {
       await api.logout();
-      setInvitePending(false);
-      setUser(null); // Login picks the invite up from the address bar.
+      setUser(null); // Login then shows the join form for the same invite.
     };
     return (
       <div className="login">
@@ -58,7 +73,7 @@ export function App() {
           <button className="primary" onClick={signOutAndJoin}>
             Sign out and join
           </button>
-          <button className="ghost" onClick={dismiss}>
+          <button className="ghost" onClick={() => setInviteToken(null)}>
             Stay signed in
           </button>
         </div>
