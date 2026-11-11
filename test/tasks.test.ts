@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { MAX_LABEL_LENGTH, MAX_LABELS } from "../src/shared/domain";
+import { MAX_CHECKLIST, MAX_CHECKLIST_TEXT, MAX_LABEL_LENGTH, MAX_LABELS, type ChecklistItem } from "../src/shared/domain";
 import { api, freshDatabase, getJson, loginAs, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
@@ -200,5 +200,46 @@ describe("the change log", () => {
     await api(`/api/tasks/${task!.id}`, { method: "PATCH", cookie, body: { assignee_id: next } });
     const [latest] = await getJson<{ detail: { changes: object } }[]>("/api/activity", cookie);
     expect(latest!.detail.changes).toEqual({ assignee_id: [task!.assignee?.id ?? null, next] });
+  });
+});
+
+describe("checklists", () => {
+  type Checked = { id: number; checklist: ChecklistItem[] };
+
+  it("are saved with the task, trimmed, and can be ticked off; the change is logged", async () => {
+    const cookie = await loginAs("manager");
+    const res = await api("/api/tasks", {
+      method: "POST",
+      cookie,
+      body: { title: "Launch", checklist: [{ text: " Write post ", done: false }, { text: "Tweet it", done: false }] },
+    });
+    const task = (await res.json()) as Checked;
+    expect(task.checklist).toEqual([
+      { text: "Write post", done: false },
+      { text: "Tweet it", done: false },
+    ]);
+
+    const ticked = [
+      { text: "Write post", done: true },
+      { text: "Tweet it", done: false },
+    ];
+    const updated = await api(`/api/tasks/${task.id}`, { method: "PATCH", cookie, body: { checklist: ticked } });
+    expect(((await updated.json()) as Checked).checklist).toEqual(ticked);
+    const [latest] = await getJson<{ detail: { changes: Record<string, unknown> } }[]>("/api/activity", cookie);
+    expect(latest!.detail.changes).toHaveProperty("checklist");
+  });
+
+  it("start empty", async () => {
+    const res = await api("/api/tasks", { method: "POST", cookie: await loginAs("manager"), body: { title: "Plain" } });
+    expect(((await res.json()) as Checked).checklist).toEqual([]);
+  });
+
+  it("are limited in size, and items need text", async () => {
+    const cookie = await loginAs("manager");
+    const post = (checklist: unknown) => api("/api/tasks", { method: "POST", cookie, body: { title: "x", checklist } });
+    const item = { text: "a", done: false };
+    expect((await post(Array(MAX_CHECKLIST + 1).fill(item))).status).toBe(400);
+    expect((await post([{ text: "  ", done: false }])).status).toBe(400);
+    expect((await post([{ text: "a".repeat(MAX_CHECKLIST_TEXT + 1), done: false }])).status).toBe(400);
   });
 });

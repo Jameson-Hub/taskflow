@@ -1,4 +1,4 @@
-import type { Action, Priority, Role, Stats, Status } from "../shared/domain";
+import type { Action, ChecklistItem, Priority, Role, Stats, Status } from "../shared/domain";
 import { can as policy } from "../shared/policy";
 
 export type { Priority, Role, Status };
@@ -31,6 +31,7 @@ export interface Task {
   created_at: string;
   updated_at: string;
   labels: string[];
+  checklist: ChecklistItem[];
 }
 
 export interface Comment {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ROLE_LABEL, STATUS_LABEL, type ActivityEntry, type Role, type Status, type User } from "./api";
-import { formatTimestamp } from "./ui";
+import type { ChecklistItem } from "../shared/domain";
+import { checklistProgress, formatTimestamp } from "./ui";
 
 const FIELD_LABEL: Record<string, string> = {
   title: "title",
@@ -31,6 +32,7 @@ function describe(entry: ActivityEntry, names: Map<number, string>) {
         if (field === "status") return `moved it to ${STATUS_LABEL[to as Status]}`;
         if (field === "assignee_id") return to === null ? "unassigned it" : `assigned it to ${names.get(to as number) ?? "someone"}`;
         if (field === "priority") return `set priority to ${to}`;
+        if (field === "checklist") return `updated the checklist (${checklistProgress(to as ChecklistItem[])} done)`;
         if (field === "labels") return (to as string[]).length ? `set labels to ${(to as string[]).join(", ")}` : "removed its labels";
         return `changed the ${FIELD_LABEL[field] ?? field}`;
       });

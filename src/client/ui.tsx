@@ -1,5 +1,14 @@
 import { useCallback, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { DAY_MS, isoDate, MAX_LABEL_LENGTH, MAX_LABELS, normalizeLabel } from "../shared/domain";
+import {
+  DAY_MS,
+  isoDate,
+  MAX_CHECKLIST,
+  MAX_CHECKLIST_TEXT,
+  MAX_LABEL_LENGTH,
+  MAX_LABELS,
+  normalizeLabel,
+  type ChecklistItem,
+} from "../shared/domain";
 
 /** Runs an async action, keeping its error message for display. */
 export function useAction() {
@@ -138,5 +147,61 @@ export function LabelInput({ value, known, onChange }: { value: string[]; known:
           ))}
       </datalist>
     </div>
+  );
+}
+
+/** "2/5": how much of a checklist is done. */
+export const checklistProgress = (items: ChecklistItem[]) => `${items.filter((i) => i.done).length}/${items.length}`;
+
+/** Editable checklist: tick, remove, and add items (Enter). Changes save with the task. */
+export function Checklist({ items, onChange }: { items: ChecklistItem[]; onChange: (items: ChecklistItem[]) => void }) {
+  const [text, setText] = useState("");
+  const update = (index: number, change: Partial<ChecklistItem>) =>
+    onChange(items.map((item, i) => (i === index ? { ...item, ...change } : item)));
+
+  function add() {
+    if (text.trim() && items.length < MAX_CHECKLIST) onChange([...items, { text: text.trim(), done: false }]);
+    setText("");
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault(); // never submits the task form
+    add();
+  }
+
+  return (
+    <fieldset className="checklist">
+      <legend>Checklist {items.length > 0 && checklistProgress(items)}</legend>
+      <ul>
+        {items.map((item, i) => (
+          <li key={i}>
+            <label className="check">
+              <input type="checkbox" checked={item.done} onChange={(e) => update(i, { done: e.target.checked })} />
+              <span className={item.done ? "done" : ""}>{item.text}</span>
+            </label>
+            <button
+              type="button"
+              className="ghost small"
+              aria-label={`Remove "${item.text}"`}
+              onClick={() => onChange(items.filter((_, j) => j !== i))}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+      {items.length < MAX_CHECKLIST && (
+        <input
+          aria-label="Add a checklist item"
+          placeholder="Add an item…"
+          maxLength={MAX_CHECKLIST_TEXT}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={add} // so text typed without Enter isn't lost on Save
+        />
+      )}
+    </fieldset>
   );
 }

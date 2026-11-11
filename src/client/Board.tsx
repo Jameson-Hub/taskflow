@@ -4,7 +4,7 @@ import { onBoardChange } from "./live";
 import { byBoardOrder, columnOf, keyboardMove, placeAt, type Direction } from "../shared/moves";
 import { TaskDrawer } from "./TaskDrawer";
 import { STATUSES } from "../shared/domain";
-import { dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
+import { checklistProgress, dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
 
 const ARROWS: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
 
@@ -256,6 +256,11 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                         <span className="card-meta">
                           <span className={`priority priority-${task.priority}`}>{task.priority}</span>
                           {due && <span className={`due ${due.tone}`}>{due.text}</span>}
+                          {task.checklist.length > 0 && (
+                            <span className="muted" title="Checklist">
+                              ☑ {checklistProgress(task.checklist)}
+                            </span>
+                          )}
                           {!editable && (
                             <span className="lock" title="You can view this task but not edit it">
                               view only

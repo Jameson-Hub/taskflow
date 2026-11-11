@@ -47,9 +47,16 @@ test("a new account gets its own empty board, and can add a task and finish it",
   await expect(todo.getByText("testing")).toBeVisible();
 
   await todo.getByText("Write the e2e tests").click();
+  await page.getByLabel("Add a checklist item").fill("Cover checklists");
+  await page.keyboard.press("Enter");
+  await page.getByLabel("Add a checklist item").fill("Run them in CI");
+  await page.keyboard.press("Enter");
+  await page.getByRole("checkbox", { name: "Cover checklists" }).check();
   await page.getByLabel("Status").selectOption("done");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByRole("region", { name: "Done" }).getByText("Write the e2e tests")).toBeVisible();
+  const done = page.getByRole("region", { name: "Done" });
+  await expect(done.getByText("Write the e2e tests")).toBeVisible();
+  await expect(done.getByText("☑ 1/2")).toBeVisible();
 });
 
 test("an invite link brings someone into the workspace with their own password", async ({ page, browser }) => {

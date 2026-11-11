@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Comment, type Priority, type Status, type Task, type User } from "./api";
-import { ErrorText, formatTimestamp, initials, LabelInput, Options, useAction } from "./ui";
+import { Checklist, ErrorText, formatTimestamp, initials, LabelInput, Options, useAction } from "./ui";
 
 interface Props {
   task: Task | null;
@@ -14,7 +14,7 @@ interface Props {
 export function TaskDrawer({ task, user, team, labels, onClose, onChanged }: Props) {
   const creating = task === null;
   const editable = creating || can.editTask(user, task);
-  const [draft, setDraft] = useState({
+  const [initial] = useState(() => ({
     title: task?.title ?? "",
     description: task?.description ?? "",
     status: task?.status ?? ("todo" as Status),
@@ -22,7 +22,15 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged }: Pro
     due_date: task?.due_date ?? "",
     assignee_id: task?.assignee?.id ?? (creating && user.role === "member" ? user.id : null),
     labels: task?.labels ?? [],
-  });
+    checklist: task?.checklist ?? [],
+  }));
+  const [draft, setDraft] = useState(initial);
+  // Closing (✕, Esc or the backdrop) asks before throwing away unsaved edits.
+  const dirty = editable && JSON.stringify(draft) !== JSON.stringify(initial);
+  const keepEditing = () => dirty && !confirm("Discard your unsaved changes?");
+  const close = () => {
+    if (!keepEditing()) onClose();
+  };
   const [comments, setComments] = useState<Comment[]>([]);
   const { error, run } = useAction();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -79,11 +87,17 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged }: Pro
     });
 
   return (
-    <dialog ref={dialog} className="drawer" onClose={onClose} onClick={(e) => e.target === dialog.current && onClose()}>
+    <dialog
+      ref={dialog}
+      className="drawer"
+      onCancel={(e) => keepEditing() && e.preventDefault()}
+      onClose={onClose}
+      onClick={(e) => e.target === dialog.current && close()}
+    >
       <form className="drawer-body" onSubmit={save}>
         <header>
           <h2>{creating ? "New task" : editable ? "Edit task" : "Task"}</h2>
-          <button type="button" className="ghost" aria-label="Close" onClick={onClose}>
+          <button type="button" className="ghost" aria-label="Close" onClick={close}>
             ✕
           </button>
         </header>
@@ -141,6 +155,7 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged }: Pro
             Labels
             <LabelInput value={draft.labels} known={labels} onChange={(next) => setDraft({ ...draft, labels: next })} />
           </label>
+          <Checklist items={draft.checklist} onChange={(next) => setDraft({ ...draft, checklist: next })} />
         </fieldset>
 
         <ErrorText error={error} />

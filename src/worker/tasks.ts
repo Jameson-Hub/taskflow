@@ -1,6 +1,17 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { MAX_LABEL_LENGTH, MAX_LABELS, normalizeLabel, PRIORITIES, STATUSES, type Priority, type Status } from "../shared/domain";
+import {
+  MAX_CHECKLIST,
+  MAX_CHECKLIST_TEXT,
+  MAX_LABEL_LENGTH,
+  MAX_LABELS,
+  normalizeLabel,
+  PRIORITIES,
+  STATUSES,
+  type ChecklistItem,
+  type Priority,
+  type Status,
+} from "../shared/domain";
 import { can } from "../shared/policy";
 import { JUST_INSERTED, logActivity } from "./activity";
 import { fail, orNotFound, idParam, readBody, requirePolicy, type AppEnv } from "./http";
@@ -18,21 +29,28 @@ type TaskRow = {
   created_by: number;
   created_at: string;
   updated_at: string;
-  /** JSON array; parsed by toTask. */
+  /** JSON arrays; parsed by toTask. */
   labels: string;
+  checklist: string;
 };
 
 const SELECT_TASK = `SELECT t.*, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id`;
 
-// labels is stored as JSON text; every other field is stored as is. All reads and writes go through these.
-const encode = (field: string, value: unknown) => (field === "labels" ? JSON.stringify(value) : (value ?? null));
-const decode = (field: string, value: unknown) => (field === "labels" ? (JSON.parse(value as string) as unknown) : value);
+// Lists are stored as JSON text; every other field is stored as is. The task routes read and write through these.
+const JSON_FIELDS = new Set(["labels", "checklist"]);
+const encode = (field: string, value: unknown) => (JSON_FIELDS.has(field) ? JSON.stringify(value) : (value ?? null));
+const decode = (field: string, value: unknown) => (JSON_FIELDS.has(field) ? (JSON.parse(value as string) as unknown) : value);
 
 /** How a task's assignee appears in responses. */
 export const assigneeOf = (id: number | null, name: string | null) => (id === null ? null : { id, name: name ?? "" });
 
-function toTask({ assignee_id, assignee_name, labels, ...rest }: TaskRow) {
-  return { ...rest, labels: decode("labels", labels) as string[], assignee: assigneeOf(assignee_id, assignee_name) };
+function toTask({ assignee_id, assignee_name, labels, checklist, ...rest }: TaskRow) {
+  return {
+    ...rest,
+    labels: decode("labels", labels) as string[],
+    checklist: decode("checklist", checklist) as ChecklistItem[],
+    assignee: assigneeOf(assignee_id, assignee_name),
+  };
 }
 
 const status = z.enum(STATUSES);
@@ -43,6 +61,10 @@ const labels = z
   .max(MAX_LABELS)
   .transform((all) => [...new Set(all)]);
 
+const checklist = z
+  .array(z.object({ text: z.string().trim().min(1).max(MAX_CHECKLIST_TEXT), done: z.boolean() }))
+  .max(MAX_CHECKLIST);
+
 const newTask = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().max(5000).default(""),
@@ -51,6 +73,7 @@ const newTask = z.object({
   due_date: dueDate.default(null),
   assignee_id: z.number().int().nullable().default(null),
   labels: labels.default([]),
+  checklist: checklist.default([]),
 });
 
 const taskPatch = z
@@ -63,6 +86,7 @@ const taskPatch = z
     assignee_id: z.number().int().nullable(),
     position: z.number().finite(),
     labels,
+    checklist,
   })
   .partial();
 
@@ -129,10 +153,10 @@ tasks.post("/", async (c) => {
   // One atomic batch. The SELECT runs before the activity insert, which would move last_insert_rowid().
   const [, created] = await c.env.DB.batch<TaskRow>([
     c.env.DB.prepare(
-      `INSERT INTO tasks (workspace_id, title, description, status, priority, due_date, assignee_id, labels, created_by, position, completed_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, (SELECT COALESCE(MAX(position), 0) + 1 FROM tasks WHERE workspace_id = ?1 AND status = ?4),
+      `INSERT INTO tasks (workspace_id, title, description, status, priority, due_date, assignee_id, labels, checklist, created_by, position, completed_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, (SELECT COALESCE(MAX(position), 0) + 1 FROM tasks WHERE workspace_id = ?1 AND status = ?4),
                CASE WHEN ?4 = 'done' THEN datetime('now') END)`,
-    ).bind(user.workspace_id, t.title, t.description, t.status, t.priority, t.due_date, t.assignee_id, encode("labels", t.labels), user.id),
+    ).bind(user.workspace_id, t.title, t.description, t.status, t.priority, t.due_date, t.assignee_id, encode("labels", t.labels), encode("checklist", t.checklist), user.id),
     c.env.DB.prepare(`${SELECT_TASK} WHERE t.id = last_insert_rowid()`),
     logActivity(c.env.DB, user, JUST_INSERTED, "task.created", { title: t.title }),
   ]);
