@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type DragEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Status, type Task, type User } from "./api";
+import { onBoardChange } from "./live";
 import { TaskDrawer } from "./TaskDrawer";
 import { STATUSES } from "../shared/domain";
 import { dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
@@ -53,6 +54,14 @@ export function Board({ user, team }: { user: User; team: User[] }) {
   useEffect(() => {
     loadLabels();
   }, [loadLabels]);
+
+  // Live updates: when anyone in the workspace changes something, reload what this board shows. An effect
+  // event reads the current filters without reconnecting the socket each time they change.
+  const refresh = useEffectEvent(() => {
+    load();
+    loadLabels();
+  });
+  useEffect(() => onBoardChange(refresh), []);
 
   useEffect(() => {
     const timer = setTimeout(load, filters.q ? 250 : 0);

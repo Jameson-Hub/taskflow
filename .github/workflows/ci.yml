@@ -78,11 +78,13 @@ jobs:
         env:
           CLOUDFLARE_ENV: dev
       - run: npm run db:migrate:dev
-      - name: Upload preview version
+      # Cloudflare doesn't make per-version preview URLs for Workers with a Durable Object, so pull requests
+      # deploy to the shared dev Worker instead (its own database; the latest PR wins).
+      - name: Deploy to dev
         id: upload
         run: |
-          npx wrangler versions upload --preview-alias "pr-${{ github.event.number }}" | tee upload.log
-          echo "url=$(grep -oE 'https://pr-[^ ]+\.workers\.dev' upload.log | head -1)" >> "$GITHUB_OUTPUT"
+          npx wrangler deploy | tee deploy.log # the build above already chose the dev environment
+          echo "url=$(grep -oE 'https://[^ ]+\.workers\.dev' deploy.log | head -1)" >> "$GITHUB_OUTPUT"
       - name: Comment preview URL
         if: steps.upload.outputs.url != ''
         uses: actions/github-script@v8

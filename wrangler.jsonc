@@ -20,6 +20,9 @@
   "triggers": { "crons": ["0 0 * * *"] },
   // Sign-up and login: 10 attempts per minute per IP.
   "ratelimits": [{ "name": "AUTH_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
+  // Live board updates: one SQLite-backed Durable Object per workspace (the free plan's kind).
+  "durable_objects": { "bindings": [{ "name": "BOARD_ROOM", "class_name": "BoardRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BoardRoom"] }],
 
   // Production is the top level above. `dev` is a separate Worker with its own database,
   // used by pull-request previews so they never touch production data.
@@ -36,7 +39,9 @@
         }
       ],
       "triggers": { "crons": ["0 0 * * *"] },
-      "ratelimits": [{ "name": "AUTH_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }]
+      "ratelimits": [{ "name": "AUTH_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }],
+      "durable_objects": { "bindings": [{ "name": "BOARD_ROOM", "class_name": "BoardRoom" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BoardRoom"] }]
     }
   }
 }

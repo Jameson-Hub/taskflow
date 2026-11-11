@@ -23,9 +23,10 @@ export async function api(
     cookie,
     origin = ORIGIN,
     ip,
-  }: { method?: string; body?: unknown; cookie?: string; origin?: string | null; ip?: string } = {},
+    headers: extra,
+  }: { method?: string; body?: unknown; cookie?: string; origin?: string | null; ip?: string; headers?: Record<string, string> } = {},
 ) {
-  const headers = new Headers();
+  const headers = new Headers(extra);
   if (ip) headers.set("CF-Connecting-IP", ip);
   if (cookie) headers.set("Cookie", cookie);
   if (origin) headers.set("Origin", origin);

@@ -5,11 +5,12 @@ import { z } from "zod";
 import { activity } from "./activity";
 import { comments } from "./comments";
 import { account } from "./account";
-import { fail, rateLimited, readBody, type AppEnv } from "./http";
+import { fail, rateLimited, readBody, requireSameOrigin, type AppEnv } from "./http";
 import { inviteAuth, invites } from "./invites";
 import { hashPassword, verifyPassword } from "./password";
 import { DEMO_WORKSPACE, deleteExpired, deleteInactiveWorkspaces, resetDemo } from "./seed";
 import { createAccount, endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
+import { live, notifyOnChange } from "./live";
 import { stats } from "./stats";
 import { tasks } from "./tasks";
 import { accountDetails, roleBody, users } from "./users";
@@ -22,11 +23,9 @@ app.onError((err, c) => {
   return c.json({ error: "Something went wrong" }, 500);
 });
 
-// Session cookies ride along on cross-site requests, so every change must come from our own origin.
+// Every change must come from our own origin (GET is safe, apart from the live WebSocket, which checks itself).
 app.use("/*", async (c, next) => {
-  if (c.req.method !== "GET" && c.req.method !== "HEAD" && c.req.header("Origin") !== new URL(c.req.url).origin) {
-    fail(403, "Cross-site request refused");
-  }
+  if (c.req.method !== "GET" && c.req.method !== "HEAD") requireSameOrigin(c);
   await next();
 });
 
@@ -100,14 +99,21 @@ app.post("/auth/logout", async (c) => {
 
 app.use("/*", requireUser);
 
+// Changes that show on the board are announced to the workspace's open boards: tasks and their comments, and
+// people leaving (their name and assignments change). Registered before the routes they cover.
+app.use("/tasks/*", notifyOnChange); // also matches /tasks itself
+app.use("/me", async (c, next) => (c.req.method === "DELETE" ? notifyOnChange(c, next) : next()));
 app.route("/me", account);
 
+app.route("/live", live);
 app.route("/users", users);
 app.route("/invites", invites);
 app.route("/tasks", tasks);
 app.route("/tasks/:taskId{[0-9]+}/comments", comments);
 app.route("/activity", activity);
 app.route("/stats", stats);
+
+export { BoardRoom } from "./live";
 
 export default {
   fetch: app.fetch,

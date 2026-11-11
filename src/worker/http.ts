@@ -11,6 +11,11 @@ export function fail(status: ContentfulStatusCode, error: string): never {
   throw new HTTPException(status, { res: Response.json({ error }, { status }) });
 }
 
+/** Session cookies ride along on cross-site requests, so anything that acts as the user must come from our own origin. */
+export function requireSameOrigin(c: { req: { url: string; header(name: string): string | undefined } }) {
+  if (c.req.header("Origin") !== new URL(c.req.url).origin) fail(403, "Cross-site request refused");
+}
+
 // Slows down password guessing and sign-up spam: per account once signed in, so a stolen
 // session can't spread guesses across IPs; per route and client IP before that.
 export const rateLimited = createMiddleware<AppEnv>(async (c, next) => {

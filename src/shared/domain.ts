@@ -9,6 +9,9 @@ export const ACTIONS = ["task.created", "task.updated", "task.deleted", "comment
 
 export const DAY_MS = 86_400_000;
 
+/** The live board's WebSocket words. "changed" carries no data: the board fetches again. */
+export const LIVE = { changed: "changed", ping: "ping", pong: "pong" } as const;
+
 /** A calendar day as YYYY-MM-DD, the way due dates are stored. */
 export const isoDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
