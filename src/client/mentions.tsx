@@ -57,7 +57,7 @@ export function CommentBox({ team, onSend }: { team: User[]; onSend: (body: stri
     <form className="comment-form" onSubmit={submit}>
       <div className="mention-box">
         <input
-          placeholder="Write a comment… (@ to mention someone)"
+          placeholder="Comment… (@ to mention)"
           aria-label="Write a comment"
           required
           maxLength={MAX_COMMENT}

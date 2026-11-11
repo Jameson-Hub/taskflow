@@ -161,3 +161,27 @@ test("@mentions suggest teammates, are highlighted, and drive the 'Mentions me' 
   await expect(page.getByText("Needs a look")).toBeVisible();
   await expect(page.getByText("Nobody mentioned here")).toHaveCount(0);
 });
+
+test("it can be installed, and fits a phone screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const manifest = await page.locator('link[rel="manifest"]').getAttribute("href");
+  const res = await page.request.get(manifest!);
+  expect(res.ok()).toBe(true);
+  expect(await res.json()).toMatchObject({ name: "TaskFlow", display: "standalone" });
+
+  await page.getByRole("button", { name: /Manager/ }).click();
+  await expect(page.locator(".card").first()).toBeVisible();
+  for (const tab of ["Board", "Dashboard", "Activity"]) {
+    await page.getByRole("link", { name: tab, exact: true }).click();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+
+  // The smallest phones, signed in as an admin with more tabs: every tab is on screen, none hidden off the edge.
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: /Admin/ }).click();
+  for (const tab of ["Board", "Dashboard", "Activity", "Team"]) {
+    await expect(page.getByRole("link", { name: tab, exact: true })).toBeInViewport({ ratio: 1 });
+  }
+});

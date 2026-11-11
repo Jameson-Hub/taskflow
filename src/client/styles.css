@@ -776,7 +776,7 @@ main {
   flex-wrap: wrap;
 }
 
-.toolbar input {
+.toolbar input[type="search"] {
   flex: 1 1 220px;
   width: auto;
 }
@@ -938,6 +938,7 @@ main {
   height: 100vh;
   max-height: 100vh;
   width: min(480px, 100vw);
+  max-width: 100vw; /* the browser's default dialog max-width leaves a gap on phones */
   border: 0;
   border-left: 1px solid var(--border);
   padding: 0;
@@ -1109,6 +1110,36 @@ main {
 
   .board {
     grid-template-columns: 1fr;
+  }
+
+  /* Logo, workspace and Sign out first; the tabs get their own row and wrap, so none are hidden. */
+  .topbar {
+    gap: 0.5rem 1rem;
+  }
+
+  .tabs {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* Search across the top, then the filters two to a row. */
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .toolbar input[type="search"],
+  .toolbar .primary {
+    grid-column: 1 / -1;
+  }
+
+  .toolbar select {
+    width: 100%;
+  }
+
+  .toolbar .check {
+    white-space: nowrap;
   }
 
   .whoami .who {

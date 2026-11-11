@@ -8,6 +8,9 @@ const DEMOS: { role: Role; blurb: string }[] = [
   { role: "member", blurb: "Works on their own tasks" },
 ];
 
+/** Opened as the installed app: "Remember me" starts ticked, or closing the app would sign you out every time. */
+const INSTALLED = matchMedia("(display-mode: standalone)").matches;
+
 type Mode = "demo" | "signin" | "signup" | "join";
 
 const MODES: { mode: Mode; label: string }[] = [
@@ -130,7 +133,7 @@ export function Login({ inviteToken, onSignedIn }: { inviteToken: string | null;
               <input name="password" type="password" autoComplete="current-password" required />
             </label>
             <label className="check">
-              <input name="remember" type="checkbox" /> Remember me for 30 days
+              <input name="remember" type="checkbox" defaultChecked={INSTALLED} /> Remember me for 30 days
             </label>
             <button className="primary" disabled={busy}>
               Sign in

@@ -6,6 +6,12 @@
     <meta name="description" content="TaskFlow: a team task board with role-based access." />
     <title>TaskFlow</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Installable: add to home screen. No service worker, so there is no offline cache to go stale. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Match --bg in styles.css (and the manifest's colours). -->
+    <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)" />
   </head>
   <body>
     <div id="root"></div>
