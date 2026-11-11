@@ -75,3 +75,23 @@ test("an invite link brings someone into the workspace with their own password",
   await expect(joiner.getByText("Member", { exact: true })).toBeVisible();
   await joiner.close();
 });
+
+test("the board works from the keyboard: shortcuts, and moving a card without a mouse", async ({ page }) => {
+  await signUp(page, `Keys ${unique()}`);
+
+  await page.keyboard.press("n");
+  await page.getByLabel("Title").fill("Move me with the keyboard");
+  await page.getByRole("button", { name: "Create task" }).click();
+  const card = page.getByRole("button", { name: /Move me with the keyboard/ });
+  await expect(page.getByRole("region", { name: "To do" }).getByText("Move me with the keyboard")).toBeVisible();
+
+  await card.focus();
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect(page.getByRole("region", { name: "In progress" }).getByText("Move me with the keyboard")).toBeVisible();
+  await expect(card).toBeFocused();
+  await expect(page.getByText(/Moved "Move me with the keyboard" to In progress/)).toBeAttached();
+
+  await page.locator(":focus").blur();
+  await page.keyboard.press("/");
+  await expect(page.getByLabel("Search tasks")).toBeFocused();
+});

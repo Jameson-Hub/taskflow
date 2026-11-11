@@ -586,6 +586,15 @@ a.bar-row:focus-visible {
   white-space: nowrap;
 }
 
+/* A visible cue for keyboard users: shown on a focused card that can be moved. */
+.card-body[data-movable]:focus-visible::after {
+  content: "Alt / Option + arrows to move";
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
 /* Honeypot: off-screen rather than display:none, which some bots skip. */
 .trap {
   position: absolute;

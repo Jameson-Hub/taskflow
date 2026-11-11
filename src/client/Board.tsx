@@ -1,17 +1,12 @@
-import { useCallback, useEffect, useEffectEvent, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Status, type Task, type User } from "./api";
 import { onBoardChange } from "./live";
+import { byBoardOrder, columnOf, keyboardMove, placeAt, type Direction } from "../shared/moves";
 import { TaskDrawer } from "./TaskDrawer";
 import { STATUSES } from "../shared/domain";
 import { dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
 
-/** Position that slots a card between its new neighbours without renumbering the column. */
-function positionBetween(before?: Task, after?: Task) {
-  if (before && after) return (before.position + after.position) / 2;
-  if (before) return before.position + 1;
-  if (after) return after.position - 1;
-  return 1;
-}
+const ARROWS: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
 
 export function Board({ user, team }: { user: User; team: User[] }) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -68,7 +63,7 @@ export function Board({ user, team }: { user: User; team: User[] }) {
     return () => clearTimeout(timer);
   }, [load, filters.q]);
 
-  const column = (status: Status) => tasks.filter((t) => t.status === status);
+  const column = (status: Status) => columnOf(tasks, status);
 
   async function drop(e: DragEvent, status: Status) {
     e.preventDefault();
@@ -78,21 +73,70 @@ export function Board({ user, team }: { user: User; team: User[] }) {
     setDropTarget(null);
     if (!task) return;
 
-    const others = column(status).filter((t) => t.id !== task.id);
-    const position = positionBetween(others[index - 1], others[index]);
+    const { position } = placeAt(tasks, task, status, index);
     if (task.status === status && task.position === position) return;
+    await move(task, status, position);
+  }
 
-    // Optimistic: move the card now, roll back if the server says no.
-    const previous = tasks;
-    setTasks((all) =>
-      all.map((t) => (t.id === task.id ? { ...t, status, position } : t)).sort((a, b) => a.position - b.position || a.id - b.id),
+  // Keyboard moves: Alt/Option + arrows on a focused card. Focus follows the card, and screen readers hear where it went.
+  const [announcement, setAnnouncement] = useState("");
+  // Once, right after the move re-renders the card (possibly in another column); later refreshes leave focus alone.
+  const refocus = useRef<number | null>(null);
+  useEffect(() => {
+    if (refocus.current === null) return;
+    document.querySelector<HTMLElement>(`[data-task="${refocus.current}"] .card-body`)?.focus();
+    refocus.current = null;
+  }, [tasks]);
+
+  async function moveWithKeys(e: KeyboardEvent<HTMLButtonElement>, task: Task, editable: boolean) {
+    const direction = ARROWS[e.key];
+    if (!e.altKey || !direction) return;
+    // Always claimed, so Alt+Left/Right never falls through to the browser's Back/Forward.
+    e.preventDefault();
+    if (!editable) return setAnnouncement(`"${task.title}" is view only, so it can't be moved`);
+    const target = keyboardMove(tasks, task, direction);
+    if (!target) return;
+    refocus.current = task.id;
+    const moved = await move(task, target.status, target.position);
+    setAnnouncement(
+      moved ? `Moved "${task.title}" to ${STATUS_LABEL[target.status]}, position ${target.index + 1}` : `Couldn't move "${task.title}"`,
     );
+  }
+
+  // Board-wide shortcuts: N for a new task, / to search.
+  const search = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      // Not while typing in a field or with a dialog open.
+      if (e.metaKey || e.ctrlKey || e.altKey || document.querySelector("dialog[open]")) return;
+      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable]")) return;
+      // e.code too, so N works on non-Latin layouts and with Caps Lock or Shift.
+      if (e.key.toLowerCase() === "n" || e.code === "KeyN") {
+        e.preventDefault();
+        setOpen("new");
+      } else if (e.key === "/") {
+        e.preventDefault();
+        search.current?.focus();
+      }
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, []);
+
+  /** Moves a card optimistically, rolling back if the server says no. Resolves to whether it stuck. */
+  async function move(task: Task, status: Status, position: number) {
+    const previous = tasks;
+    setTasks((all) => all.map((t) => (t.id === task.id ? { ...t, status, position } : t)).sort(byBoardOrder));
+    let moved = true;
     await run(() =>
       api.updateTask(task.id, { status, position }).catch((err) => {
+        moved = false;
+        refocus.current = task.id; // the rollback may remount the card in its old column
         setTasks(previous);
         throw err;
       }),
     );
+    return moved;
   }
 
   function overCard(e: DragEvent, status: Status, index: number) {
@@ -107,8 +151,9 @@ export function Board({ user, team }: { user: User; team: User[] }) {
     <div className="board-page">
       <div className="toolbar">
         <input
+          ref={search}
           type="search"
-          placeholder="Search tasks…"
+          placeholder="Search tasks…  ( / )"
           aria-label="Search tasks"
           value={filters.q}
           onChange={(e) => setFilters({ ...filters, q: e.target.value })}
@@ -136,10 +181,16 @@ export function Board({ user, team }: { user: User; team: User[] }) {
             <Options labels={Object.fromEntries([...labels, ...(filters.label ? [filters.label] : [])].map((l) => [l, l]))} />
           </select>
         )}
-        <button className="primary" onClick={() => setOpen("new")}>
+        <button className="primary" onClick={() => setOpen("new")} aria-keyshortcuts="N" title="New task (N)">
           + New task
         </button>
       </div>
+      <p className="sr-only" aria-live="polite">
+        {announcement}
+      </p>
+      <p id="move-hint" className="sr-only">
+        Press Alt or Option with the arrow keys to move this card.
+      </p>
 
       <ErrorText error={error} onDismiss={() => setError("")} />
 
@@ -167,6 +218,7 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                   return (
                     <li
                       key={task.id}
+                      data-task={task.id}
                       className={[
                         "card",
                         dragging === task.id && "is-dragging",
@@ -186,7 +238,13 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                       }}
                       onDragOver={(e) => overCard(e, status, index)}
                     >
-                      <button className="card-body" onClick={() => setOpen(task)}>
+                      <button
+                        className="card-body"
+                        onClick={() => setOpen(task)}
+                        onKeyDown={(e) => moveWithKeys(e, task, editable)}
+                        aria-describedby={editable ? "move-hint" : undefined}
+                        data-movable={editable || undefined}
+                      >
                         <span className="card-title">{task.title}</span>
                         {task.labels.length > 0 && (
                           <span className="card-labels">
