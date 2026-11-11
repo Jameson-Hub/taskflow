@@ -15,18 +15,21 @@ type SeedTask = {
   creator: number;
   dueInDays: number | null;
   labels: string[];
+  /** Back-dated so the dashboard's finished-work charts have some history. */
+  createdDaysAgo?: number;
+  doneDaysAgo?: number;
 };
 
 // assignee and creator are indexes into TEAM.
 const TASKS: SeedTask[] = [
-  { title: "Set up CI pipeline for the API", status: "done", priority: "high", assignee: 0, creator: 0, dueInDays: null, labels: ["devops"] },
+  { title: "Set up CI pipeline for the API", status: "done", priority: "high", assignee: 0, creator: 0, dueInDays: null, labels: ["devops"], createdDaysAgo: 20, doneDaysAgo: 9 },
   { title: "Design onboarding flow", status: "in_progress", priority: "high", assignee: 2, creator: 1, dueInDays: 3, labels: ["design", "frontend"] },
   { title: "Write release notes for v1.2", status: "todo", priority: "medium", assignee: 3, creator: 1, dueInDays: 5, labels: ["docs"] },
   { title: "Fix timezone bug on due dates", status: "in_progress", priority: "high", assignee: 3, creator: 1, dueInDays: 1, labels: ["bug", "frontend"] },
   { title: "Audit role permissions", status: "todo", priority: "high", assignee: 0, creator: 0, dueInDays: 7, labels: ["security"] },
   { title: "Update dependency versions", status: "todo", priority: "low", assignee: null, creator: 1, dueInDays: null, labels: ["devops"] },
   { title: "Add empty states to the board", status: "todo", priority: "medium", assignee: 2, creator: 2, dueInDays: 10, labels: ["design", "frontend"] },
-  { title: "Customer interview notes", status: "done", priority: "low", assignee: 2, creator: 1, dueInDays: null, labels: ["research"] },
+  { title: "Customer interview notes", status: "done", priority: "low", assignee: 2, creator: 1, dueInDays: null, labels: ["research"], createdDaysAgo: 6, doneDaysAgo: 2 },
 ];
 
 export const DEMO_WORKSPACE = 1;
@@ -46,11 +49,11 @@ export async function resetDemo(db: D1Database) {
         .prepare("INSERT INTO users (email, name, role, is_demo, workspace_id) VALUES (?, ?, ?, 1, ?)")
         .bind(u.email, u.name, u.role, DEMO_WORKSPACE),
     ),
-    ...TASKS.map(({ title, status, priority, assignee, creator, dueInDays, labels }, i) =>
+    ...TASKS.map(({ title, status, priority, assignee, creator, dueInDays, labels, createdDaysAgo = 0, doneDaysAgo }, i) =>
       db
         .prepare(
-          `INSERT INTO tasks (workspace_id, title, status, priority, position, assignee_id, created_by, due_date, labels)
-           VALUES (?, ?, ?, ?, ?, ${userId}, ${userId}, ?, ?)`,
+          `INSERT INTO tasks (workspace_id, title, status, priority, position, assignee_id, created_by, due_date, labels, created_at, completed_at)
+           VALUES (?, ?, ?, ?, ?, ${userId}, ${userId}, ?, ?, datetime('now', ?), datetime('now', ?))`,
         )
         .bind(
           DEMO_WORKSPACE,
@@ -62,6 +65,9 @@ export async function resetDemo(db: D1Database) {
           TEAM[creator]!.email,
           day(dueInDays),
           JSON.stringify(labels),
+          `-${createdDaysAgo} days`,
+          // datetime('now', NULL) is NULL, so open tasks get no completed_at.
+          doneDaysAgo === undefined ? null : `-${doneDaysAgo} days`,
         ),
     ),
   ]);

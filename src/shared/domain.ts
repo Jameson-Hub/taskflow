@@ -12,6 +12,8 @@ export const DAY_MS = 86_400_000;
 /** A calendar day as YYYY-MM-DD, the way due dates are stored. */
 export const isoDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
+/** How many weeks of finished work the dashboard's trend shows, this week last. */
+export const TREND_WEEKS = 8;
 /** How many days the dashboard's "Due in the next N days" strip shows, starting today. */
 export const UPCOMING_DAYS = 14;
 /** Open tasks untouched this long show under "Needs attention". */
@@ -43,6 +45,10 @@ export interface Stats {
   attention: { overdue: AttentionTask[]; stale: AttentionTask[] };
   /** Open tasks due on each of the next UPCOMING_DAYS days, starting today. */
   upcoming: { date: string; count: number }[];
+  /** Tasks finished in each of the last TREND_WEEKS 7-day weeks, oldest first; the last one ends today. */
+  completed: { week_start: string; count: number }[];
+  /** Average days from created to finished, for tasks finished in those weeks; null if none. */
+  avg_days_to_done: number | null;
 }
 
 export interface AttentionTask {

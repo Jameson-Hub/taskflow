@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { DAY_MS, isoDate, UPCOMING_DAYS, type Stats } from "../src/shared/domain";
+import { DAY_MS, isoDate, TREND_WEEKS, UPCOMING_DAYS, type Stats } from "../src/shared/domain";
 import { api, freshDatabase, getJson, loginAs, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
@@ -56,6 +56,7 @@ describe("dashboard stats", () => {
     expect(s).toMatchObject({ open: 0, done: 0, overdue: 0, due_soon: 0, by_status: { todo: 0, in_progress: 0, done: 0 }, labels: [] });
     expect(s.workload).toEqual([]);
     expect(s.attention).toEqual({ overdue: [], stale: [] });
+    expect(s.completed.every((w) => w.count === 0)).toBe(true);
     expect(s.upcoming.every((d) => d.count === 0)).toBe(true);
   });
 
@@ -121,5 +122,53 @@ describe("just me", () => {
     expect(s.workload.map((w) => w.name)).toEqual(["Sam Cruz"]);
     expect(s.labels.map((l) => l.name)).toEqual(expect.arrayContaining(["design", "frontend", "research"]));
     expect(s.labels.map((l) => l.name)).not.toContain("devops");
+  });
+});
+
+describe("finished work", () => {
+  it("counts tasks finished in each of the last 8 weeks, oldest first", async () => {
+    const { completed } = await stats(await loginAs("member"));
+    expect(completed).toHaveLength(TREND_WEEKS);
+    expect(completed.at(-1)).toMatchObject({ week_start: day(-6) });
+    // Demo: "Customer interview notes" finished 2 days ago, "Set up CI pipeline" 9 days ago.
+    expect(completed.map((w) => w.count)).toEqual([...Array(TREND_WEEKS - 2).fill(0), 1, 1]);
+  });
+
+  it("averages days from created to finished", async () => {
+    // Demo: 20 days → done 9 days ago (11 days), 6 days → done 2 days ago (4 days).
+    expect((await stats(await loginAs("member"))).avg_days_to_done).toBe(7.5);
+  });
+
+  it("stamps a task when it's finished and clears it when it's reopened", async () => {
+    const cookie = await loginAs("manager");
+    const created = await (await api("/api/tasks", { method: "POST", cookie, body: { title: "Quick fix" } })).json();
+    const id = (created as { id: number }).id;
+    const thisWeek = async () => (await stats(cookie)).completed.at(-1)!.count;
+
+    await api(`/api/tasks/${id}`, { method: "PATCH", cookie, body: { status: "done" } });
+    expect(await thisWeek()).toBe(2);
+    await api(`/api/tasks/${id}`, { method: "PATCH", cookie, body: { status: "in_progress" } });
+    expect(await thisWeek()).toBe(1);
+  });
+
+  it("stamps a fresh date when a task reopened elsewhere is finished again", async () => {
+    const cookie = await loginAs("manager");
+    // Reopened the way the previous release would during a deploy: status changed, old stamp left behind.
+    await env.DB.prepare("UPDATE tasks SET status = 'todo', completed_at = datetime('now', '-30 days') WHERE title = 'Customer interview notes'").run();
+    const [task] = (await getJson<{ id: number; title: string }[]>("/api/tasks", cookie)).filter((t) => t.title === "Customer interview notes");
+
+    await api(`/api/tasks/${task!.id}`, { method: "PATCH", cookie, body: { status: "done" } });
+    expect((await stats(cookie)).completed.at(-1)!.count).toBe(1);
+  });
+
+  it("follows the just-me filter", async () => {
+    // Sam finished the interview notes; the CI pipeline was Alex's.
+    const { completed, avg_days_to_done } = await stats(await loginAs("member"), day(0), { mine: true });
+    expect(completed.map((w) => w.count).slice(-2)).toEqual([0, 1]);
+    expect(avg_days_to_done).toBe(4);
+  });
+
+  it("has no average when nothing is finished", async () => {
+    expect((await stats(sessionCookie(await signUp()))).avg_days_to_done).toBeNull();
   });
 });

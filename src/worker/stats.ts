@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { DAY_MS, DUE_SOON_WINDOW_DAYS, isoDate, OPEN_STATUSES, PRIORITIES, STALE_DAYS, STATUSES, UPCOMING_DAYS, type Stats } from "../shared/domain";
+import { DAY_MS, DUE_SOON_WINDOW_DAYS, isoDate, OPEN_STATUSES, PRIORITIES, STALE_DAYS, STATUSES, TREND_WEEKS, UPCOMING_DAYS, type Stats } from "../shared/domain";
 import { assigneeOf } from "./tasks";
 import type { AppEnv } from "./http";
 
@@ -39,7 +39,12 @@ stats.get("/", async (c) => {
   const OPEN = `${SCOPE} AND ${IS_OPEN}`;
   const ATTENTION = `SELECT t.id, t.title, t.due_date, t.assignee_id, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE ${OPEN}`;
 
-  const [byStatus, byPriority, deadlines, workload, labels, overdue, stale, upcoming] = await db.batch([
+  // Finished tasks in the trend window (calendar day of completion, UTC), by week back from today: 0 = this week.
+  // No upper bound: for a viewer behind UTC, something finished this evening is already "tomorrow" in UTC.
+  // Compared as text against datetime() output, the format completed_at is stored in, so no function wraps the column.
+  const trendWindow = `-${TREND_WEEKS * 7 - 1} days`;
+
+  const [byStatus, byPriority, deadlines, workload, labels, overdue, stale, upcoming, finishedByWeek] = await db.batch([
     db.prepare(`SELECT status AS key, COUNT(*) AS n FROM tasks t WHERE ${SCOPE} GROUP BY status`).bind(...scope),
     db.prepare(`SELECT priority AS key, COUNT(*) AS n FROM tasks t WHERE ${OPEN} GROUP BY priority`).bind(...scope),
     db
@@ -71,10 +76,23 @@ stats.get("/", async (c) => {
     db
       .prepare(`SELECT due_date AS key, COUNT(*) AS n FROM tasks t WHERE ${OPEN} AND due_date >= ?4 AND due_date < ?5 GROUP BY due_date`)
       .bind(...scope, today, plusDays(UPCOMING_DAYS)),
+    db
+      .prepare(
+        `SELECT MAX(0, CAST((julianday(?4) - julianday(date(t.completed_at))) / 7 AS INTEGER)) AS key, COUNT(*) AS n,
+                SUM(julianday(t.completed_at) - julianday(t.created_at)) AS days
+         FROM tasks t WHERE ${SCOPE} AND t.status = 'done'
+           AND t.completed_at >= datetime(?4, ?5)
+         GROUP BY key`,
+      )
+      .bind(...scope, today, trendWindow),
   ]);
 
   const by_status = countsFor(STATUSES, byStatus!.results as KeyCount[]);
   const dueOn = new Map((upcoming!.results as KeyCount[]).map((r) => [r.key, r.n]));
+  const weeks = finishedByWeek!.results as { key: number; n: number; days: number }[];
+  const weeksBack = new Map(weeks.map((r) => [r.key, r.n]));
+  const finished = weeks.reduce((sum, r) => sum + r.n, 0);
+  const avgDays = finished ? weeks.reduce((sum, r) => sum + r.days, 0) / finished : null;
   const body: Stats = {
     open: OPEN_STATUSES.reduce((sum, s) => sum + by_status[s], 0),
     done: by_status.done,
@@ -88,6 +106,11 @@ stats.get("/", async (c) => {
       stale: (stale!.results as AttentionRow[]).map(toAttentionTask),
     },
     upcoming: Array.from({ length: UPCOMING_DAYS }, (_, i) => plusDays(i)).map((date) => ({ date, count: dueOn.get(date) ?? 0 })),
+    completed: Array.from({ length: TREND_WEEKS }, (_, i) => {
+      const back = TREND_WEEKS - 1 - i;
+      return { week_start: plusDays(-7 * back - 6), count: weeksBack.get(back) ?? 0 };
+    }),
+    avg_days_to_done: avgDays === null ? null : Math.round(avgDays * 10) / 10,
   };
   return c.json(body);
 });

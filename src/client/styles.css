@@ -529,7 +529,7 @@ a.bar-row:focus-visible {
   white-space: nowrap;
 }
 
-.upcoming {
+.column-strip {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -541,29 +541,30 @@ a.bar-row:focus-visible {
   text-align: center;
 }
 
-.upcoming li {
+.column-strip li {
   display: grid;
   grid-template-rows: 1rem 4rem auto;
+  min-width: 0;
   gap: 0.2rem;
   color: var(--muted);
 }
 
-.upcoming li.today {
+.column-strip li.highlight {
   color: var(--text);
   font-weight: 600;
 }
 
-.upcoming-count {
+.column-count {
   font-variant-numeric: tabular-nums;
 }
 
-.upcoming-bar {
+.column-bar {
   display: flex;
   align-items: flex-end;
   justify-content: center;
 }
 
-.upcoming-bar span {
+.column-bar span {
   width: min(10px, 70%);
   min-height: 4px;
   border-radius: 4px 4px 0 0;

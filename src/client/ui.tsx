@@ -61,8 +61,13 @@ export function dueLabel(date: string) {
   if (days < 0) return { text: `${-days}d overdue`, tone: "late" };
   if (days === 0) return { text: "Due today", tone: "soon" };
   if (days <= CARD_SOON_DAYS) return { text: `Due in ${days}d`, tone: "soon" };
-  return { text: new Date(date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }), tone: "" };
+  return { text: shortDate(date), tone: "" };
 }
+
+/** A stored YYYY-MM-DD day as local midnight, so it formats as that same calendar day. */
+export const dayOf = (iso: string) => new Date(iso + "T00:00");
+export const shortDate = (iso: string) => dayOf(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+export const longDate = (iso: string) => dayOf(iso).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
 /** D1's datetime('now') is UTC without a zone suffix. */
 export const formatTimestamp = (sqlite: string) => new Date(sqlite + "Z").toLocaleString();

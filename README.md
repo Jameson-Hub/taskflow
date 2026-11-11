@@ -18,7 +18,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
   | Activity log | ✓ | ✓ | |
   | Add people, change roles | ✓ | | |
 
-- **Dashboard** with open, overdue and due-this-week counts, a "needs attention" list, the next 14 days, and bar charts of work by status, priority, person and label. Click a bar to open the board filtered to it, or switch to just your own tasks.
+- **Dashboard** with open, overdue and due-this-week counts, average days to finish, finished work per week, a "needs attention" list, the next 14 days, and bar charts of work by status, priority, person and label. Click a bar to open the board filtered to it, or switch to just your own tasks.
 - **Activity log** recording who created, changed, moved, deleted or commented on what, and role changes
 - **Comments, due dates, priorities, labels**, search and filters
 - **Sign up for a private workspace**: you become its admin and add your team. Workspaces are fully isolated from each other.

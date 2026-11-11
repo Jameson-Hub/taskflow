@@ -129,21 +129,10 @@ tasks.post("/", async (c) => {
   // One atomic batch. The SELECT runs before the activity insert, which would move last_insert_rowid().
   const [, created] = await c.env.DB.batch<TaskRow>([
     c.env.DB.prepare(
-      `INSERT INTO tasks (workspace_id, title, description, status, priority, due_date, assignee_id, labels, created_by, position)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM tasks WHERE workspace_id = ? AND status = ?))`,
-    ).bind(
-      user.workspace_id,
-      t.title,
-      t.description,
-      t.status,
-      t.priority,
-      t.due_date,
-      t.assignee_id,
-      encode("labels", t.labels),
-      user.id,
-      user.workspace_id,
-      t.status,
-    ),
+      `INSERT INTO tasks (workspace_id, title, description, status, priority, due_date, assignee_id, labels, created_by, position, completed_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, (SELECT COALESCE(MAX(position), 0) + 1 FROM tasks WHERE workspace_id = ?1 AND status = ?4),
+               CASE WHEN ?4 = 'done' THEN datetime('now') END)`,
+    ).bind(user.workspace_id, t.title, t.description, t.status, t.priority, t.due_date, t.assignee_id, encode("labels", t.labels), user.id),
     c.env.DB.prepare(`${SELECT_TASK} WHERE t.id = last_insert_rowid()`),
     logActivity(c.env.DB, user, JUST_INSERTED, "task.created", { title: t.title }),
   ]);
@@ -163,10 +152,19 @@ tasks.patch("/:id{[0-9]+}", async (c) => {
   const fields = Object.keys(changes) as (keyof typeof changes)[];
   if (fields.length === 0) return c.json(toTask(task));
 
-  const update = c.env.DB.prepare(
-    // Reordering isn't work on the task, so a position-only change leaves updated_at alone.
-    `UPDATE tasks SET ${fields.map((f) => `${f} = ?`).join(", ")}${fields.some((f) => f !== "position") ? ", updated_at = datetime('now')" : ""} WHERE id = ?`,
-  ).bind(...fields.map((f) => encode(f, changes[f])), task.id);
+  // Reordering isn't work on the task, so a position-only change leaves updated_at alone.
+  const touched = fields.some((f) => f !== "position") ? ", updated_at = datetime('now')" : "";
+  // Finishing stamps completed_at, keeping the stamp only if it was already done and stamped (in SET, `status` is the
+  // value before this update); reopening clears it.
+  const completion = !changes.status
+    ? ""
+    : changes.status === "done"
+      ? ", completed_at = CASE WHEN status = 'done' AND completed_at IS NOT NULL THEN completed_at ELSE datetime('now') END"
+      : ", completed_at = NULL";
+  const update = c.env.DB.prepare(`UPDATE tasks SET ${fields.map((f) => `${f} = ?`).join(", ")}${touched}${completion} WHERE id = ?`).bind(
+    ...fields.map((f) => encode(f, changes[f])),
+    task.id,
+  );
 
   // Compared in stored form; reordering alone is noise in the log, so only real edits are recorded.
   const changed = Object.fromEntries(

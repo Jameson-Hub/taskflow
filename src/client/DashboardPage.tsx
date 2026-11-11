@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { PRIORITIES, STALE_DAYS, STATUSES, UPCOMING_DAYS, type AttentionTask, type Stats } from "../shared/domain";
+import { PRIORITIES, STALE_DAYS, STATUSES, TREND_WEEKS, UPCOMING_DAYS, type AttentionTask, type Stats } from "../shared/domain";
 import { api, PRIORITY_LABEL, STATUS_LABEL, type User } from "./api";
-import { boardLink, dueLabel, ErrorText, LabelChip, localToday, useAction } from "./ui";
+import { boardLink, dayOf, dueLabel, ErrorText, LabelChip, localToday, longDate, shortDate, useAction } from "./ui";
 
 export function DashboardPage({ me }: { me: User }) {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -35,6 +35,7 @@ export function DashboardPage({ me }: { me: User }) {
         <Kpi label="Overdue" value={stats.overdue} tone={stats.overdue > 0 ? "late" : undefined} />
         <Kpi label="Due this week" value={stats.due_soon} />
         <Kpi label="Done" value={stats.done} />
+        <Kpi label={`Avg. days to finish (${TREND_WEEKS} wk)`} value={stats.avg_days_to_done ?? "–"} />
       </div>
 
       {total === 0 ? (
@@ -50,7 +51,11 @@ export function DashboardPage({ me }: { me: User }) {
           </Chart>
 
           <Chart title={`Due in the next ${UPCOMING_DAYS} days`}>
-            <Upcoming days={stats.upcoming} />
+            <ColumnStrip label="Tasks due each day" columns={upcomingColumns(stats.upcoming)} />
+          </Chart>
+
+          <Chart title={`Finished per week, last ${TREND_WEEKS} weeks`}>
+            <ColumnStrip label="Tasks finished each week" columns={weeklyColumns(stats.completed)} />
           </Chart>
 
           <Chart title="Tasks by status">
@@ -113,7 +118,7 @@ export function DashboardPage({ me }: { me: User }) {
   );
 }
 
-function Kpi({ label, value, tone }: { label: string; value: number; tone?: "late" }) {
+function Kpi({ label, value, tone }: { label: string; value: number | string; tone?: "late" }) {
   return (
     <div className={`kpi ${tone ?? ""}`}>
       <span className="kpi-value">{value}</span>
@@ -199,35 +204,58 @@ function AttentionList({ title, tasks, showDue = false }: { title: string; tasks
   );
 }
 
-/** A strip of the coming days, one column each; today first. */
-function Upcoming({ days }: { days: Stats["upcoming"] }) {
-  const busiest = Math.max(1, ...days.map((d) => d.count));
+interface Column {
+  key: string;
+  /** Short label under the column; hidden from screen readers, which read `description`. */
+  label: ReactNode;
+  description: string;
+  count: number;
+  highlight?: boolean;
+}
+
+/** A row of small vertical bars: the days ahead, or the weeks behind. */
+function ColumnStrip({ label, columns }: { label: string; columns: Column[] }) {
+  const busiest = Math.max(1, ...columns.map((c) => c.count));
   return (
-    <ol className="upcoming">
-      {days.map((d, i) => {
-        const date = new Date(d.date + "T00:00");
-        const weekday = date.toLocaleDateString(undefined, { weekday: "narrow" });
-        return (
-          <li
-            key={d.date}
-            className={i === 0 ? "today" : ""}
-            title={`${date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${d.count} due`}
-          >
-            <span className="sr-only">{`${date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}: ${d.count} due`}</span>
-            <span className="upcoming-count" aria-hidden="true">
-              {d.count || ""}
-            </span>
-            <span className="upcoming-bar" aria-hidden="true">
-              {d.count > 0 && <span style={{ height: `${(d.count / busiest) * 100}%` }} />}
-            </span>
-            <span className="upcoming-day" aria-hidden="true">
-              {weekday}
-              <br />
-              {date.getDate()}
-            </span>
-          </li>
-        );
-      })}
+    <ol className="column-strip" aria-label={label}>
+      {columns.map((c) => (
+        <li key={c.key} className={c.highlight ? "highlight" : ""}>
+          <span className="sr-only">{c.description}</span>
+          <span className="column-count" aria-hidden="true">
+            {c.count || ""}
+          </span>
+          <span className="column-bar" aria-hidden="true">
+            {c.count > 0 && <span style={{ height: `${(c.count / busiest) * 100}%` }} />}
+          </span>
+          <span className="column-label" aria-hidden="true">
+            {c.label}
+          </span>
+        </li>
+      ))}
     </ol>
   );
 }
+
+const upcomingColumns = (days: Stats["upcoming"]): Column[] =>
+  days.map((d, i) => ({
+    key: d.date,
+    label: (
+      <>
+        {dayOf(d.date).toLocaleDateString(undefined, { weekday: "narrow" })}
+        <br />
+        {dayOf(d.date).getDate()}
+      </>
+    ),
+    description: `${longDate(d.date)}: ${d.count} due`,
+    count: d.count,
+    highlight: i === 0,
+  }));
+
+const weeklyColumns = (weeks: Stats["completed"]): Column[] =>
+  weeks.map((w, i) => ({
+    key: w.week_start,
+    label: i === weeks.length - 1 ? "This wk" : shortDate(w.week_start),
+    description: `Week of ${longDate(w.week_start)}: ${w.count} finished`,
+    count: w.count,
+    highlight: i === weeks.length - 1,
+  }));
