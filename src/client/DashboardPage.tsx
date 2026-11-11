@@ -1,24 +1,33 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { PRIORITIES, STATUSES, type Stats } from "../shared/domain";
-import { api, PRIORITY_LABEL, STATUS_LABEL } from "./api";
-import { ErrorText, LabelChip, localToday, useAction } from "./ui";
+import { PRIORITIES, STALE_DAYS, STATUSES, UPCOMING_DAYS, type AttentionTask, type Stats } from "../shared/domain";
+import { api, PRIORITY_LABEL, STATUS_LABEL, type User } from "./api";
+import { boardLink, dueLabel, ErrorText, LabelChip, localToday, useAction } from "./ui";
 
-export function DashboardPage() {
+export function DashboardPage({ me }: { me: User }) {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [mine, setMine] = useState(false);
   const { error, run } = useAction();
 
   useEffect(() => {
-    run(async () => setStats(await api.stats(localToday())));
-  }, [run]);
+    run(async () => setStats(await api.stats(localToday(), mine)));
+  }, [run, mine]);
 
   if (!stats) return <ErrorText error={error} />;
+
+  // With "Just my tasks" on, links keep that filter so the board shows what was counted.
+  const link = (params: Record<string, string | number>) => boardLink(mine ? { assignee: me.id, ...params } : params);
 
   const total = stats.open + stats.done;
   const busiest = Math.max(1, ...stats.workload.map((w) => w.open));
 
   return (
     <section className="page dashboard">
-      <h1>Dashboard</h1>
+      <header className="page-head">
+        <h1>Dashboard</h1>
+        <label className="check">
+          <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> Just my tasks
+        </label>
+      </header>
       <ErrorText error={error} />
 
       <div className="kpis">
@@ -29,9 +38,21 @@ export function DashboardPage() {
       </div>
 
       {total === 0 ? (
-        <p className="muted">No tasks yet. Add some on the board and they'll show up here.</p>
+        <p className="muted">
+          {mine ? "Nothing is assigned to you yet." : "No tasks yet. Add some on the board and they'll show up here."}
+        </p>
       ) : (
         <div className="charts">
+          <Chart title="Needs attention">
+            <AttentionList title="Overdue" tasks={stats.attention.overdue} showDue />
+            <AttentionList title={`Untouched for ${STALE_DAYS} days`} tasks={stats.attention.stale} />
+            {stats.attention.overdue.length + stats.attention.stale.length === 0 && <p className="muted small">All clear.</p>}
+          </Chart>
+
+          <Chart title={`Due in the next ${UPCOMING_DAYS} days`}>
+            <Upcoming days={stats.upcoming} />
+          </Chart>
+
           <Chart title="Tasks by status">
             {STATUSES.map((s) => (
               <Bar key={s} label={STATUS_LABEL[s]} value={stats.by_status[s]} max={total} />
@@ -39,29 +60,51 @@ export function DashboardPage() {
           </Chart>
 
           <Chart title="Open tasks by priority">
-            {PRIORITIES.map((p) => (
-              <Bar key={p} label={PRIORITY_LABEL[p]} value={stats.by_priority[p]} max={Math.max(1, stats.open)} />
+            {[...PRIORITIES].reverse().map((p) => (
+              <Bar
+                key={p}
+                label={PRIORITY_LABEL[p]}
+                value={stats.by_priority[p]}
+                max={Math.max(1, stats.open)}
+                href={link({ priority: p })}
+              />
             ))}
           </Chart>
 
-          <Chart
-            title="Open tasks per person"
-            legend={
-              <span className="legend">
-                <span className="swatch" /> On time <span className="swatch overdue" /> Overdue
-              </span>
-            }
-          >
-            {stats.workload.length === 0 && <p className="muted small">Nothing open.</p>}
-            {stats.workload.map((w) => (
-              <Bar key={w.id ?? "none"} label={w.name} value={w.open} overdue={w.overdue} max={busiest} />
-            ))}
-          </Chart>
+          {!mine && (
+            <Chart
+              title="Open tasks per person"
+              legend={
+                <span className="legend">
+                  <span className="swatch" /> On time <span className="swatch overdue" /> Overdue
+                </span>
+              }
+            >
+              {stats.workload.length === 0 && <p className="muted small">Nothing open.</p>}
+              {stats.workload.map((w) => (
+                <Bar
+                  key={w.id ?? "none"}
+                  label={w.name}
+                  value={w.open}
+                  overdue={w.overdue}
+                  max={busiest}
+                  href={boardLink({ assignee: w.id ?? "none" })}
+                />
+              ))}
+            </Chart>
+          )}
 
           <Chart title="Most used labels">
             {stats.labels.length === 0 && <p className="muted small">No labels yet.</p>}
             {stats.labels.map((l) => (
-              <Bar key={l.name} label={<LabelChip name={l.name} />} name={l.name} value={l.count} max={stats.labels[0]!.count} />
+              <Bar
+                key={l.name}
+                label={<LabelChip name={l.name} />}
+                name={l.name}
+                value={l.count}
+                max={stats.labels[0]!.count}
+                href={link({ label: l.name })}
+              />
             ))}
           </Chart>
         </div>
@@ -95,11 +138,22 @@ function Chart({ title, legend, children }: { title: string; legend?: ReactNode;
 }
 
 /** One row: label, a bar scaled to `max`, and the number. An overdue share is drawn as its own segment. */
-function Bar({ label, name, value, max, overdue = 0 }: { label: ReactNode; name?: string; value: number; max: number; overdue?: number }) {
+interface BarProps {
+  label: ReactNode;
+  /** Text for the tooltip when the label isn't plain text. */
+  name?: string;
+  value: number;
+  max: number;
+  overdue?: number;
+  /** Where clicking the row goes: the board, filtered to this row. */
+  href?: string;
+}
+
+function Bar({ label, name, value, max, overdue = 0, href }: BarProps) {
   const width = (n: number) => `${(n / max) * 100}%`;
   const tip = overdue ? `${value} open, ${overdue} overdue` : String(value);
   return (
-    <div className="bar-row" title={`${name ?? label}: ${tip}`}>
+    <BarRow href={href} title={`${name ?? label}: ${tip}`}>
       <span className="bar-label">{label}</span>
       <span className="bar-track">
         {value - overdue > 0 && <span className="bar-fill" style={{ width: width(value - overdue) }} />}
@@ -109,6 +163,71 @@ function Bar({ label, name, value, max, overdue = 0 }: { label: ReactNode; name?
         {value}
         {overdue > 0 && <span className="late"> · {overdue} overdue</span>}
       </span>
+    </BarRow>
+  );
+}
+
+function BarRow({ href, title, children }: { href?: string; title: string; children: ReactNode }) {
+  return href ? (
+    <a className="bar-row link" href={href} title={`${title} · open on the board`}>
+      {children}
+    </a>
+  ) : (
+    <div className="bar-row" title={title}>
+      {children}
     </div>
+  );
+}
+
+function AttentionList({ title, tasks, showDue = false }: { title: string; tasks: AttentionTask[]; showDue?: boolean }) {
+  if (tasks.length === 0) return null;
+  return (
+    <div className="attention">
+      <h3>{title}</h3>
+      <ul>
+        {tasks.map((t) => (
+          <li key={t.id}>
+            <a href={boardLink({ task: t.id })}>{t.title}</a>
+            <span className="muted small">
+              {showDue && t.due_date && <span className="late">{dueLabel(t.due_date).text} · </span>}
+              {t.assignee?.name ?? "Unassigned"}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** A strip of the coming days, one column each; today first. */
+function Upcoming({ days }: { days: Stats["upcoming"] }) {
+  const busiest = Math.max(1, ...days.map((d) => d.count));
+  return (
+    <ol className="upcoming">
+      {days.map((d, i) => {
+        const date = new Date(d.date + "T00:00");
+        const weekday = date.toLocaleDateString(undefined, { weekday: "narrow" });
+        return (
+          <li
+            key={d.date}
+            className={i === 0 ? "today" : ""}
+            title={`${date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${d.count} due`}
+          >
+            <span className="sr-only">{`${date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}: ${d.count} due`}</span>
+            <span className="upcoming-count" aria-hidden="true">
+              {d.count || ""}
+            </span>
+            <span className="upcoming-bar" aria-hidden="true">
+              {d.count > 0 && <span style={{ height: `${(d.count / busiest) * 100}%` }} />}
+            </span>
+            <span className="upcoming-day" aria-hidden="true">
+              {weekday}
+              <br />
+              {date.getDate()}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

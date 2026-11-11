@@ -1,11 +1,13 @@
+import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { DAY_MS, isoDate, type Stats } from "../src/shared/domain";
+import { DAY_MS, isoDate, UPCOMING_DAYS, type Stats } from "../src/shared/domain";
 import { api, freshDatabase, getJson, loginAs, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
 
 const day = (offset: number) => isoDate(Date.now() + offset * DAY_MS);
-const stats = (cookie: string, today = day(0)) => getJson<Stats>(`/api/stats?today=${today}`, cookie);
+const stats = (cookie: string, today = day(0), { mine = false } = {}) =>
+  getJson<Stats>(`/api/stats?today=${today}${mine ? "&mine=1" : ""}`, cookie);
 
 describe("dashboard stats", () => {
   it("count the board by status and open work by priority", async () => {
@@ -53,11 +55,71 @@ describe("dashboard stats", () => {
     const s = await stats(sessionCookie(await signUp()));
     expect(s).toMatchObject({ open: 0, done: 0, overdue: 0, due_soon: 0, by_status: { todo: 0, in_progress: 0, done: 0 }, labels: [] });
     expect(s.workload).toEqual([]);
+    expect(s.attention).toEqual({ overdue: [], stale: [] });
+    expect(s.upcoming.every((d) => d.count === 0)).toBe(true);
   });
 
   it("fall back to today in UTC when the date is missing or malformed", async () => {
     const cookie = await loginAs("member");
     const fallback = await getJson<Stats>("/api/stats?today=nonsense", cookie);
     expect(fallback).toEqual(await stats(cookie, isoDate(Date.now())));
+  });
+});
+
+describe("needs attention", () => {
+  it("lists overdue open tasks, most overdue first", async () => {
+    const cookie = await loginAs("manager");
+    await api("/api/tasks", { method: "POST", cookie, body: { title: "A bit late", due_date: day(-1) } });
+    await api("/api/tasks", { method: "POST", cookie, body: { title: "Very late", due_date: day(-5) } });
+    await api("/api/tasks", { method: "POST", cookie, body: { title: "Late but done", due_date: day(-5), status: "done" } });
+    const { attention } = await stats(cookie);
+    expect(attention.overdue.map((t) => t.title)).toEqual(["Very late", "A bit late"]);
+    expect(attention.overdue[0]).toMatchObject({ due_date: day(-5), assignee: null });
+  });
+
+  it("lists open tasks nobody has touched in 14 days", async () => {
+    const cookie = await loginAs("manager");
+    await env.DB.prepare("UPDATE tasks SET updated_at = datetime('now', '-15 days') WHERE title IN ('Audit role permissions', 'Customer interview notes')").run();
+    const { attention } = await stats(cookie);
+    // The done one doesn't need attention.
+    expect(attention.stale.map((t) => t.title)).toEqual(["Audit role permissions"]);
+  });
+});
+
+describe("what counts as touching a task", () => {
+  const staleTitles = async (cookie: string) => (await stats(cookie)).attention.stale.map((t) => t.title);
+
+  it("a comment does; dragging it within its column doesn't", async () => {
+    const cookie = await loginAs("manager");
+    const age = () => env.DB.prepare("UPDATE tasks SET updated_at = datetime('now', '-15 days') WHERE title = 'Audit role permissions'").run();
+    const [task] = (await getJson<{ id: number; title: string }[]>("/api/tasks", cookie)).filter((t) => t.title === "Audit role permissions");
+
+    await age();
+    await api(`/api/tasks/${task!.id}`, { method: "PATCH", cookie, body: { position: 99 } });
+    expect(await staleTitles(cookie)).toContain("Audit role permissions");
+
+    await api(`/api/tasks/${task!.id}/comments`, { method: "POST", cookie, body: { body: "On it" } });
+    expect(await staleTitles(cookie)).not.toContain("Audit role permissions");
+  });
+});
+
+describe("the next 14 days", () => {
+  it("counts open tasks due on each day, starting today", async () => {
+    const { upcoming } = await stats(await loginAs("member"));
+    expect(upcoming).toHaveLength(UPCOMING_DAYS);
+    expect(upcoming[0]!.date).toBe(day(0));
+    // Demo tasks are due in 1, 3, 5, 7 and 10 days.
+    expect(upcoming.filter((d) => d.count > 0).map((d) => d.date)).toEqual([1, 3, 5, 7, 10].map(day));
+  });
+});
+
+describe("just me", () => {
+  it("counts only the viewer's own tasks", async () => {
+    const cookie = await loginAs("member"); // Sam: 2 open (Design onboarding flow, empty states), 1 done
+    const s = await stats(cookie, day(0), { mine: true });
+    expect(s).toMatchObject({ open: 2, done: 1 });
+    expect(s.workload.map((w) => w.name)).toEqual(["Sam Cruz"]);
+    expect(s.labels.map((l) => l.name)).toEqual(expect.arrayContaining(["design", "frontend", "research"]));
+    expect(s.labels.map((l) => l.name)).not.toContain("devops");
   });
 });

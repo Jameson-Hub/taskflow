@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Status, type Task, type User } from "./api";
 import { TaskDrawer } from "./TaskDrawer";
-import { DAY_MS, STATUSES } from "../shared/domain";
-import { ErrorText, initials, LabelChip, localToday, Options, useAction } from "./ui";
-
-/** Cards say "Due in Nd" instead of the date this close to the deadline. */
-const CARD_SOON_DAYS = 2;
+import { STATUSES } from "../shared/domain";
+import { dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
 
 /** Position that slots a card between its new neighbours without renumbering the column. */
 function positionBetween(before?: Task, after?: Task) {
@@ -15,25 +12,41 @@ function positionBetween(before?: Task, after?: Task) {
   return 1;
 }
 
-// Due dates are calendar days, so compare against the viewer's local date, not UTC's.
-function dueLabel(date: string) {
-  const days = Math.round((Date.parse(date) - Date.parse(localToday())) / DAY_MS);
-  if (days < 0) return { text: `${-days}d overdue`, tone: "late" };
-  if (days === 0) return { text: "Due today", tone: "soon" };
-  if (days <= CARD_SOON_DAYS) return { text: `Due in ${days}d`, tone: "soon" };
-  return { text: new Date(date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }), tone: "" };
-}
-
 export function Board({ user, team }: { user: User; team: User[] }) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [filters, setFilters] = useState({ q: "", assignee: "", priority: "", label: "" });
+  // A dashboard link can arrive with filters set or a task to open; read it once, then tidy the address.
+  const [linked] = useState(() => parseHash().params);
+  const [filters, setFilters] = useState(() => ({
+    q: "",
+    assignee: linked.get("assignee") ?? "",
+    priority: linked.get("priority") ?? "",
+    label: linked.get("label") ?? "",
+  }));
+  useEffect(() => {
+    if (location.hash.includes("?")) history.replaceState(null, "", "#board");
+  }, []);
   const [labels, setLabels] = useState<string[]>([]);
   const [open, setOpen] = useState<Task | "new" | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<{ status: Status; index: number } | null>(null);
   const { error, setError, run } = useAction();
 
-  const load = useCallback(() => run(() => api.tasks(filters).then(setTasks)), [filters, run]);
+  // A linked task opens once, on the first load that has it; cleared so later reloads don't reopen it.
+  const linkedTask = useRef(Number(linked.get("task")) || null);
+  const load = useCallback(
+    () =>
+      run(async () => {
+        const list = await api.tasks(filters);
+        setTasks(list);
+        const wanted = linkedTask.current;
+        if (wanted === null) return;
+        linkedTask.current = null;
+        const task = list.find((t) => t.id === wanted);
+        if (task) setOpen(task);
+        else throw new Error("That task no longer exists");
+      }),
+    [filters, run],
+  );
   // Filtering never changes which labels exist, so these load on open and after a save only.
   const loadLabels = useCallback(() => run(() => api.labels().then(setLabels)), [run]);
 

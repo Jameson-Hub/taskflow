@@ -1,5 +1,5 @@
 import { useCallback, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { isoDate, MAX_LABEL_LENGTH, MAX_LABELS, normalizeLabel } from "../shared/domain";
+import { DAY_MS, isoDate, MAX_LABEL_LENGTH, MAX_LABELS, normalizeLabel } from "../shared/domain";
 
 /** Runs an async action, keeping its error message for display. */
 export function useAction() {
@@ -40,8 +40,29 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase();
 
+/** The app's routes live in the hash: `#page?key=value`, e.g. `#board?assignee=4&label=bug` or `#board?task=12`. */
+export function parseHash() {
+  const [page = "", query = ""] = location.hash.slice(1).split("?");
+  return { page, params: new URLSearchParams(query) };
+}
+
+export const boardLink = (params: Record<string, string | number>) =>
+  `#board?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}`;
+
 /** Today on the viewer's own calendar; due dates and "overdue" are measured against this. */
 export const localToday = () => isoDate(Date.now() - new Date().getTimezoneOffset() * 60_000);
+
+/** Due labels say "Due in Nd" instead of the date this close to the deadline. */
+const CARD_SOON_DAYS = 2;
+
+// Due dates are calendar days, so compare against the viewer's local date, not UTC's.
+export function dueLabel(date: string) {
+  const days = Math.round((Date.parse(date) - Date.parse(localToday())) / DAY_MS);
+  if (days < 0) return { text: `${-days}d overdue`, tone: "late" };
+  if (days === 0) return { text: "Due today", tone: "soon" };
+  if (days <= CARD_SOON_DAYS) return { text: `Due in ${days}d`, tone: "soon" };
+  return { text: new Date(date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }), tone: "" };
+}
 
 /** D1's datetime('now') is UTC without a zone suffix. */
 export const formatTimestamp = (sqlite: string) => new Date(sqlite + "Z").toLocaleString();

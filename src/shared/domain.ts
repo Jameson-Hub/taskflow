@@ -12,6 +12,10 @@ export const DAY_MS = 86_400_000;
 /** A calendar day as YYYY-MM-DD, the way due dates are stored. */
 export const isoDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
+/** How many days the dashboard's "Due in the next N days" strip shows, starting today. */
+export const UPCOMING_DAYS = 14;
+/** Open tasks untouched this long show under "Needs attention". */
+export const STALE_DAYS = 14;
 /** The dashboard's "due this week": today and the 6 days after it. */
 export const DUE_SOON_WINDOW_DAYS = 7;
 
@@ -35,4 +39,15 @@ export interface Stats {
   by_priority: Record<Priority, number>;
   workload: { id: number | null; name: string; open: number; overdue: number }[];
   labels: { name: string; count: number }[];
+  /** Open tasks to look at: past their due date, or untouched for STALE_DAYS. */
+  attention: { overdue: AttentionTask[]; stale: AttentionTask[] };
+  /** Open tasks due on each of the next UPCOMING_DAYS days, starting today. */
+  upcoming: { date: string; count: number }[];
+}
+
+export interface AttentionTask {
+  id: number;
+  title: string;
+  due_date: string | null;
+  assignee: { id: number; name: string } | null;
 }

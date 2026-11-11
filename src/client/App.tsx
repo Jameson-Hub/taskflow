@@ -6,12 +6,13 @@ import { Board } from "./Board";
 import { DashboardPage } from "./DashboardPage";
 import { inviteToken, Login } from "./Login";
 import { TeamPage } from "./TeamPage";
+import { parseHash } from "./ui";
 
 const PAGES = ["board", "dashboard", "activity", "team", "account"] as const;
 type Page = (typeof PAGES)[number];
 
 const pageFromHash = (): Page => {
-  const page = location.hash.slice(1);
+  const { page } = parseHash();
   return PAGES.find((p) => p === page) ?? "board";
 };
 
@@ -115,7 +116,7 @@ export function App() {
       {user.demo_workspace && <p className="notice">Demo workspace. Everything resets at midnight UTC.</p>}
       <main>
         {current === "board" && <Board user={user} team={team} />}
-        {current === "dashboard" && <DashboardPage />}
+        {current === "dashboard" && <DashboardPage me={user} />}
         {current === "activity" && <ActivityPage team={team} />}
         {current === "team" && <TeamPage me={user} team={team} setTeam={setTeam} />}
         {current === "account" && <AccountPage me={user} team={team} setTeam={setTeam} onDeleted={clearUser} />}

@@ -28,8 +28,11 @@ const SELECT_TASK = `SELECT t.*, u.name AS assignee_name FROM tasks t LEFT JOIN 
 const encode = (field: string, value: unknown) => (field === "labels" ? JSON.stringify(value) : (value ?? null));
 const decode = (field: string, value: unknown) => (field === "labels" ? (JSON.parse(value as string) as unknown) : value);
 
+/** How a task's assignee appears in responses. */
+export const assigneeOf = (id: number | null, name: string | null) => (id === null ? null : { id, name: name ?? "" });
+
 function toTask({ assignee_id, assignee_name, labels, ...rest }: TaskRow) {
-  return { ...rest, labels: decode("labels", labels) as string[], assignee: assignee_id === null ? null : { id: assignee_id, name: assignee_name } };
+  return { ...rest, labels: decode("labels", labels) as string[], assignee: assigneeOf(assignee_id, assignee_name) };
 }
 
 const status = z.enum(STATUSES);
@@ -161,7 +164,8 @@ tasks.patch("/:id{[0-9]+}", async (c) => {
   if (fields.length === 0) return c.json(toTask(task));
 
   const update = c.env.DB.prepare(
-    `UPDATE tasks SET ${fields.map((f) => `${f} = ?`).join(", ")}, updated_at = datetime('now') WHERE id = ?`,
+    // Reordering isn't work on the task, so a position-only change leaves updated_at alone.
+    `UPDATE tasks SET ${fields.map((f) => `${f} = ?`).join(", ")}${fields.some((f) => f !== "position") ? ", updated_at = datetime('now')" : ""} WHERE id = ?`,
   ).bind(...fields.map((f) => encode(f, changes[f])), task.id);
 
   // Compared in stored form; reordering alone is noise in the log, so only real edits are recorded.

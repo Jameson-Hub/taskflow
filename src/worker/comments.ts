@@ -40,6 +40,8 @@ comments.post("/", async (c) => {
   const [inserted] = await c.env.DB.batch<Omit<CommentRow, "author_name">>([
     c.env.DB.prepare("INSERT INTO comments (task_id, user_id, body) VALUES (?, ?, ?) RETURNING *").bind(task.id, user.id, body),
     logActivity(c.env.DB, user, task.id, "comment.added", { title: task.title }),
+    // A discussion is work on the task, so it no longer counts as untouched.
+    c.env.DB.prepare("UPDATE tasks SET updated_at = datetime('now') WHERE id = ?").bind(task.id),
   ]);
   return c.json(toComment({ ...inserted!.results[0]!, author_name: user.name }), 201);
 });

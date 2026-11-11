@@ -389,7 +389,8 @@ label.check input {
 
 .kpi.late .kpi-value,
 .kpi.late .kpi-label,
-.bar-value .late {
+.bar-value .late,
+.attention .late {
   color: var(--late);
 }
 
@@ -480,9 +481,108 @@ label.check input {
   background: var(--bar-overdue);
 }
 
+a.bar-row {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+a.bar-row:hover,
+a.bar-row:focus-visible {
+  background: var(--surface-2);
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.attention h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.attention ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.attention li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.attention a {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upcoming {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.upcoming li {
+  display: grid;
+  grid-template-rows: 1rem 4rem auto;
+  gap: 0.2rem;
+  color: var(--muted);
+}
+
+.upcoming li.today {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.upcoming-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.upcoming-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.upcoming-bar span {
+  width: min(10px, 70%);
+  min-height: 4px;
+  border-radius: 4px 4px 0 0;
+  background: var(--bar);
+}
+
 .bar-value {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* Read by screen readers, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* Honeypot: off-screen rather than display:none, which some bots skip. */

@@ -93,7 +93,7 @@ export const api = {
     return request<Task[]>("GET", `/tasks${query ? `?${query}` : ""}`);
   },
   labels: () => request<string[]>("GET", "/tasks/labels"),
-  stats: (today: string) => request<Stats>("GET", `/stats?today=${today}`),
+  stats: (today: string, mine: boolean) => request<Stats>("GET", `/stats?today=${today}${mine ? "&mine=1" : ""}`),
   createTask: (task: Partial<Task> & { assignee_id?: number | null }) => request<Task>("POST", "/tasks", task),
   updateTask: (id: number, changes: Partial<Omit<Task, "assignee">> & { assignee_id?: number | null }) =>
     request<Task>("PATCH", `/tasks/${id}`, changes),
