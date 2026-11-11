@@ -630,6 +630,10 @@ main {
   gap: 1rem;
 }
 
+.page.narrow {
+  max-width: 440px;
+}
+
 .page p {
   margin: 0;
 }

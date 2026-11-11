@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
+import { AccountPage } from "./AccountPage";
 import { ActivityPage } from "./ActivityPage";
 import { api, can, ROLE_LABEL, whenSessionExpires, type User } from "./api";
 import { Board } from "./Board";
 import { Login } from "./Login";
 import { TeamPage } from "./TeamPage";
 
-type Page = "board" | "activity" | "team";
+const PAGES = ["board", "activity", "team", "account"] as const;
+type Page = (typeof PAGES)[number];
 
 const pageFromHash = (): Page => {
   const page = location.hash.slice(1);
-  return page === "activity" || page === "team" ? page : "board";
+  return PAGES.find((p) => p === page) ?? "board";
 };
 
 export function App() {
@@ -38,13 +40,18 @@ export function App() {
     { id: "board", label: "Board", show: true },
     { id: "activity", label: "Activity", show: can.viewActivity(user) },
     { id: "team", label: "Team", show: can.manageTeam(user) },
+    { id: "account", label: "Account", show: !user.demo },
   ];
   const current = tabs.find((t) => t.id === page && t.show)?.id ?? "board";
 
-  async function signOut() {
-    await api.logout();
+  function clearUser() {
     location.hash = "";
     setUser(null);
+  }
+
+  async function signOut() {
+    await api.logout();
+    clearUser();
   }
 
   return (
@@ -80,6 +87,7 @@ export function App() {
         {current === "board" && <Board user={user} team={team} />}
         {current === "activity" && <ActivityPage team={team} />}
         {current === "team" && <TeamPage me={user} team={team} setTeam={setTeam} />}
+        {current === "account" && <AccountPage me={user} team={team} setTeam={setTeam} onDeleted={clearUser} />}
       </main>
     </div>
   );

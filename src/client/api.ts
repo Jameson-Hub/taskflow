@@ -71,6 +71,8 @@ export const api = {
   signup: (details: { name: string; email: string; password: string; workspace: string; website: string }) =>
     request<User>("POST", "/auth/signup", details),
   logout: () => request("POST", "/auth/logout"),
+  changePassword: (current: string, next: string) => request("POST", "/me/password", { current, next }),
+  deleteAccount: (password: string, deleteWorkspace: boolean) => request("DELETE", "/me", { password, deleteWorkspace }),
 
   users: () => request<User[]>("GET", "/users"),
   createUser: (user: Pick<User, "name" | "email" | "role"> & { password: string }) => request<User>("POST", "/users", user),

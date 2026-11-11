@@ -28,7 +28,8 @@ export interface User {
 }
 
 const USER_COLUMNS = "u.id, u.email, u.name, u.role, u.is_demo, u.workspace_id, u.last_seen_at, w.name AS workspace";
-const FROM_USERS = "FROM users u JOIN workspaces w ON w.id = u.workspace_id";
+// Deleted (anonymised) accounts never come back from these.
+const FROM_USERS = "FROM users u JOIN workspaces w ON w.id = u.workspace_id AND u.deleted_at IS NULL";
 
 /** Every user query goes through these, so the workspace always comes along. Filter with `u.`-prefixed columns. */
 export const SELECT_USER = `SELECT ${USER_COLUMNS} ${FROM_USERS}`;
@@ -82,8 +83,18 @@ export async function deleteExpiredSessions(db: D1Database) {
   await db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(new Date().toISOString()).run();
 }
 
+/** Signs the user out everywhere except the browser making this request. */
+export async function deleteOtherSessions(c: Context, db: D1Database, userId: number) {
+  const token = getCookie(c, SESSION_COOKIE) ?? "";
+  return db.prepare("DELETE FROM sessions WHERE user_id = ? AND id <> ?").bind(userId, await sha256(token));
+}
+
 export async function endSession(c: Context, db: D1Database) {
   const token = getCookie(c, SESSION_COOKIE);
   if (token) await db.prepare("DELETE FROM sessions WHERE id = ?").bind(await sha256(token)).run();
+  clearSessionCookie(c);
+}
+
+export function clearSessionCookie(c: Context) {
   deleteCookie(c, SESSION_COOKIE, { path: "/", secure: true });
 }

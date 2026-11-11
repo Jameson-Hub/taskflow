@@ -11,6 +11,10 @@ export const riley = { email: "riley@example.com", name: "Riley Park", role: "me
 
 const ORIGIN = "http://taskflow.test";
 
+/** A different client per call, so the per-IP rate limit only bites in tests that pick an IP on purpose. */
+let ipCounter = 0;
+const nextIp = () => `192.0.2.${++ipCounter % 250}`;
+
 export async function api(
   path: string,
   {
@@ -50,14 +54,14 @@ export async function runNightlyReset() {
 
 export const ana = { name: "Ana Reyes", email: "ana@example.com", password: "a long enough password", workspace: "Ana's Studio" };
 
-export async function signUp(details: Partial<typeof ana> & { website?: string } = {}, ip?: string) {
+export async function signUp(details: Partial<typeof ana> & { website?: string } = {}, ip = nextIp()) {
   return api("/api/auth/signup", { method: "POST", body: { ...ana, ...details }, ip });
 }
 
 export async function loginWithPassword({
   email = ana.email,
   password = ana.password,
-  ip,
+  ip = nextIp(),
   remember,
 }: { email?: string; password?: string; ip?: string; remember?: boolean } = {}) {
   return api("/api/auth/login", { method: "POST", body: { email, password, remember }, ip });

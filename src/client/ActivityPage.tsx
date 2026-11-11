@@ -20,6 +20,8 @@ function describe(entry: ActivityEntry, names: Map<number, string>) {
       return `deleted ${title}`;
     case "comment.added":
       return `commented on ${title}`;
+    case "user.left":
+      return "deleted their account";
     case "user.role_changed": {
       const [from, to] = entry.detail.changes?.role ?? [];
       return `changed ${entry.detail.title}'s role from ${ROLE_LABEL[from as Role]} to ${ROLE_LABEL[to as Role]}`;

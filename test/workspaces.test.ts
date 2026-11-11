@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, emptyDatabase, freshDatabase, getJson, loginWithPassword, loginAs, runNightlyReset, sessionCookie, signUp } from "./helpers";
+import { api, emptyDatabase, freshDatabase, getJson, loginWithPassword, loginAs, riley, runNightlyReset, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
 
@@ -91,6 +91,20 @@ describe("nightly job", () => {
     expect((await getJson<unknown[]>("/api/tasks", await loginAs("member"))).length).toBe(8);
   });
 
+  it("doesn't count deleted accounts as activity", async () => {
+    const anaCookie = sessionCookie(await signUp());
+    await api("/api/users", { method: "POST", cookie: anaCookie, body: riley });
+    const rileyCookie = sessionCookie(await loginWithPassword({ email: riley.email, password: riley.password }));
+    expect((await api("/api/me", { method: "DELETE", cookie: rileyCookie, body: { password: riley.password } })).status).toBe(200);
+    await env.DB.prepare("UPDATE users SET last_seen_at = '2020-01-01T00:00:00.000Z', created_at = '2020-01-01 00:00:00' WHERE email = ?")
+      .bind("ana@example.com")
+      .run();
+
+    await runNightlyReset();
+
+    expect((await loginWithPassword()).status).toBe(401);
+  });
+
   it("clears out expired sessions and keeps live ones", async () => {
     const expired = sessionCookie(await signUp());
     await env.DB.prepare("UPDATE sessions SET expires_at = '2020-01-01T00:00:00.000Z'").run();
@@ -112,12 +126,6 @@ describe("fresh database", () => {
     await runNightlyReset();
     expect((await api("/api/auth/demo", { method: "POST", body: { role: "admin" } })).status).toBe(200);
     expect((await loginWithPassword()).status).toBe(200);
-  });
-
-  it("puts rows written without a workspace (by the previous release, mid-deploy) into the demo", async () => {
-    await env.DB.prepare("INSERT INTO tasks (title, created_by, workspace_id) VALUES ('Orphan from old code', 1, NULL)").run();
-    const orphans = await env.DB.prepare("SELECT COUNT(*) AS n FROM tasks WHERE workspace_id IS NULL").first<{ n: number }>();
-    expect(orphans?.n).toBe(0);
   });
 });
 

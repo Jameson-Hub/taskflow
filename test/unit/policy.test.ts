@@ -54,3 +54,4 @@ describe("deleting a comment", () => {
     expect(can.deleteComment(admin, 3)).toBe(true);
   });
 });
+

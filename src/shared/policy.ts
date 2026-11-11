@@ -20,3 +20,4 @@ export const can = {
   viewActivity: isLead,
   manageTeam: (u: Actor) => u.role === "admin",
 };
+

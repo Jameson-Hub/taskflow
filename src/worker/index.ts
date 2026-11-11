@@ -4,7 +4,8 @@ import { createMiddleware } from "hono/factory";
 import { z } from "zod";
 import { activity } from "./activity";
 import { comments } from "./comments";
-import { fail, readBody, type AppEnv } from "./http";
+import { account } from "./account";
+import { fail, rateLimited, readBody, type AppEnv } from "./http";
 import { hashPassword, verifyPassword } from "./password";
 import { DEMO_WORKSPACE, deleteInactiveWorkspaces, resetDemo } from "./seed";
 import { deleteExpiredSessions, endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
@@ -24,14 +25,6 @@ app.use("/*", async (c, next) => {
   if (c.req.method !== "GET" && c.req.method !== "HEAD" && c.req.header("Origin") !== new URL(c.req.url).origin) {
     fail(403, "Cross-site request refused");
   }
-  await next();
-});
-
-// Slows down password guessing and sign-up spam, per client IP.
-const rateLimited = createMiddleware<AppEnv>(async (c, next) => {
-  const ip = c.req.header("CF-Connecting-IP") ?? "local";
-  const { success } = await c.env.AUTH_LIMITER.limit({ key: `${c.req.path}:${ip}` });
-  if (!success) fail(429, "Too many attempts. Wait a minute and try again.");
   await next();
 });
 
@@ -110,7 +103,7 @@ app.post("/auth/logout", async (c) => {
 
 app.use("/*", requireUser);
 
-app.get("/me", (c) => c.json(publicUser(c.var.user)));
+app.route("/me", account);
 
 app.route("/users", users);
 app.route("/tasks", tasks);

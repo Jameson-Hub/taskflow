@@ -11,6 +11,16 @@ export function fail(status: ContentfulStatusCode, error: string): never {
   throw new HTTPException(status, { res: Response.json({ error }, { status }) });
 }
 
+// Slows down password guessing and sign-up spam: per account once signed in, so a stolen
+// session can't spread guesses across IPs; per route and client IP before that.
+export const rateLimited = createMiddleware<AppEnv>(async (c, next) => {
+  const user = c.var.user as User | undefined;
+  const key = user ? `user:${user.id}` : `${c.req.path}:${c.req.header("CF-Connecting-IP") ?? "local"}`;
+  const { success } = await c.env.AUTH_LIMITER.limit({ key });
+  if (!success) fail(429, "Too many attempts. Wait a minute and try again.");
+  await next();
+});
+
 export const requirePolicy = (allowed: (user: User) => boolean) =>
   createMiddleware<AppEnv>(async (c, next) => {
     if (!allowed(c.var.user)) fail(403, "Your role can't do that");

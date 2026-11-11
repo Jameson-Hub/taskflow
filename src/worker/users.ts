@@ -17,6 +17,15 @@ export const newUser = z.object({
   password: z.string().min(12).max(200),
 });
 
+/** Whether anyone besides `user` can run their workspace. */
+export async function otherAdmin(db: D1Database, user: User) {
+  const row = await db
+    .prepare("SELECT 1 FROM users WHERE workspace_id = ? AND id <> ? AND role = 'admin' AND deleted_at IS NULL")
+    .bind(user.workspace_id, user.id)
+    .first();
+  return row !== null;
+}
+
 export const users = new Hono<AppEnv>();
 
 users.get("/", async (c) => {
@@ -53,6 +62,7 @@ users.patch("/:id{[0-9]+}", requirePolicy(can.manageTeam), async (c) => {
   );
   if (target.is_demo) fail(403, "Demo accounts keep their roles");
   if (target.role === role) return c.json(publicUser(target));
+  if (target.role === "admin" && !(await otherAdmin(c.env.DB, target))) fail(409, "A workspace needs at least one admin");
   await c.env.DB.batch([
     c.env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, target.id),
     logActivity(c.env.DB, c.var.user, null, "user.role_changed", { title: target.name, changes: { role: [target.role, role] } }),

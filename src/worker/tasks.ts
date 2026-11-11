@@ -53,7 +53,7 @@ const taskPatch = z
 
 async function requireAssignee(db: D1Database, workspaceId: number, id: number | null | undefined) {
   if (id === null || id === undefined) return;
-  const onTeam = await db.prepare("SELECT 1 FROM users WHERE id = ? AND workspace_id = ?").bind(id, workspaceId).first();
+  const onTeam = await db.prepare("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL").bind(id, workspaceId).first();
   if (!onTeam) fail(400, "Assignee isn't on the team");
 }
 

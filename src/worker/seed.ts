@@ -56,7 +56,7 @@ export async function deleteInactiveWorkspaces(db: D1Database) {
   await db
     .prepare(
       `DELETE FROM workspaces WHERE id <> ? AND NOT EXISTS (
-         SELECT 1 FROM users u WHERE u.workspace_id = workspaces.id AND datetime(COALESCE(u.last_seen_at, u.created_at)) > datetime(?))`,
+         SELECT 1 FROM users u WHERE u.workspace_id = workspaces.id AND u.deleted_at IS NULL AND datetime(COALESCE(u.last_seen_at, u.created_at)) > datetime(?))`,
     )
     .bind(DEMO_WORKSPACE, cutoff)
     .run();
