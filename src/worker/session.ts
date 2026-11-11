@@ -1,6 +1,6 @@
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { Context } from "hono";
-import { DAY_MS, type Role } from "../shared/domain";
+import { DAY_MS, isoDate, type Role } from "../shared/domain";
 import { fail } from "./http";
 import { DEMO_WORKSPACE } from "./seed";
 
@@ -98,7 +98,7 @@ export async function sessionUser(c: Context, db: D1Database): Promise<User | nu
 
 /** Recorded at most once a day per user; inactive workspaces are cleaned up from it. */
 export function touchLastSeen(db: D1Database, user: User) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = isoDate(Date.now());
   if (user.last_seen_at?.startsWith(today)) return null;
   return db.prepare("UPDATE users SET last_seen_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
 }

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState, type DragEvent } from "react";
 import { api, can, PRIORITY_LABEL, STATUS_LABEL, type Status, type Task, type User } from "./api";
 import { TaskDrawer } from "./TaskDrawer";
 import { DAY_MS, STATUSES } from "../shared/domain";
-import { ErrorText, initials, LabelChip, Options, useAction } from "./ui";
+import { ErrorText, initials, LabelChip, localToday, Options, useAction } from "./ui";
+
+/** Cards say "Due in Nd" instead of the date this close to the deadline. */
+const CARD_SOON_DAYS = 2;
 
 /** Position that slots a card between its new neighbours without renumbering the column. */
 function positionBetween(before?: Task, after?: Task) {
@@ -14,12 +17,10 @@ function positionBetween(before?: Task, after?: Task) {
 
 // Due dates are calendar days, so compare against the viewer's local date, not UTC's.
 function dueLabel(date: string) {
-  const now = new Date();
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const days = Math.round((Date.parse(date) - today) / DAY_MS);
+  const days = Math.round((Date.parse(date) - Date.parse(localToday())) / DAY_MS);
   if (days < 0) return { text: `${-days}d overdue`, tone: "late" };
   if (days === 0) return { text: "Due today", tone: "soon" };
-  if (days <= 2) return { text: `Due in ${days}d`, tone: "soon" };
+  if (days <= CARD_SOON_DAYS) return { text: `Due in ${days}d`, tone: "soon" };
   return { text: new Date(date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }), tone: "" };
 }
 

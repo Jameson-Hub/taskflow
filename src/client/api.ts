@@ -1,4 +1,4 @@
-import type { Action, Priority, Role, Status } from "../shared/domain";
+import type { Action, Priority, Role, Stats, Status } from "../shared/domain";
 import { can as policy } from "../shared/policy";
 
 export type { Priority, Role, Status };
@@ -93,6 +93,7 @@ export const api = {
     return request<Task[]>("GET", `/tasks${query ? `?${query}` : ""}`);
   },
   labels: () => request<string[]>("GET", "/tasks/labels"),
+  stats: (today: string) => request<Stats>("GET", `/stats?today=${today}`),
   createTask: (task: Partial<Task> & { assignee_id?: number | null }) => request<Task>("POST", "/tasks", task),
   updateTask: (id: number, changes: Partial<Omit<Task, "assignee">> & { assignee_id?: number | null }) =>
     request<Task>("PATCH", `/tasks/${id}`, changes),

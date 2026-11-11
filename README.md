@@ -18,6 +18,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
   | Activity log | ✓ | ✓ | |
   | Add people, change roles | ✓ | | |
 
+- **Dashboard** with open, overdue and due-this-week counts and bar charts of work by status, priority, person and label
 - **Activity log** recording who created, changed, moved, deleted or commented on what, and role changes
 - **Comments, due dates, priorities, labels**, search and filters
 - **Sign up for a private workspace**: you become its admin and add your team. Workspaces are fully isolated from each other.
@@ -77,7 +78,7 @@ npm run lint
 npm run typecheck
 ```
 
-- **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, search, the activity log and the nightly reset.
+- **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, search, labels, the dashboard counts, the activity log and the nightly reset.
 - **Unit tests** (`test/unit/`) cover the pure logic on its own: the permission rules and password hashing.
 
 ## Deployment

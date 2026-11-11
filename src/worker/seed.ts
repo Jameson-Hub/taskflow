@@ -1,4 +1,4 @@
-import { DAY_MS, type Priority, type Status } from "../shared/domain";
+import { DAY_MS, isoDate, type Priority, type Status } from "../shared/domain";
 
 const TEAM = [
   { email: "admin@taskflow.demo", name: "Alex Rivera", role: "admin" },
@@ -34,8 +34,7 @@ const INACTIVE_DAYS = 30;
 
 /** Rebuilds the demo workspace from scratch; real workspaces are untouched. Runs nightly and in tests. */
 export async function resetDemo(db: D1Database) {
-  const day = (offset: number | null) =>
-    offset === null ? null : new Date(Date.now() + offset * DAY_MS).toISOString().slice(0, 10);
+  const day = (offset: number | null) => (offset === null ? null : isoDate(Date.now() + offset * DAY_MS));
   const userId = "(SELECT id FROM users WHERE email = ?)";
 
   await db.batch([

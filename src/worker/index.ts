@@ -10,6 +10,7 @@ import { inviteAuth, invites } from "./invites";
 import { hashPassword, verifyPassword } from "./password";
 import { DEMO_WORKSPACE, deleteExpired, deleteInactiveWorkspaces, resetDemo } from "./seed";
 import { createAccount, endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
+import { stats } from "./stats";
 import { tasks } from "./tasks";
 import { accountDetails, roleBody, users } from "./users";
 
@@ -106,6 +107,7 @@ app.route("/invites", invites);
 app.route("/tasks", tasks);
 app.route("/tasks/:taskId{[0-9]+}/comments", comments);
 app.route("/activity", activity);
+app.route("/stats", stats);
 
 export default {
   fetch: app.fetch,

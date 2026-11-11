@@ -3,10 +3,11 @@ import { AccountPage } from "./AccountPage";
 import { ActivityPage } from "./ActivityPage";
 import { api, can, ROLE_LABEL, whenSessionExpires, type User } from "./api";
 import { Board } from "./Board";
+import { DashboardPage } from "./DashboardPage";
 import { inviteToken, Login } from "./Login";
 import { TeamPage } from "./TeamPage";
 
-const PAGES = ["board", "activity", "team", "account"] as const;
+const PAGES = ["board", "dashboard", "activity", "team", "account"] as const;
 type Page = (typeof PAGES)[number];
 
 const pageFromHash = (): Page => {
@@ -66,6 +67,7 @@ export function App() {
 
   const tabs: { id: Page; label: string; show: boolean }[] = [
     { id: "board", label: "Board", show: true },
+    { id: "dashboard", label: "Dashboard", show: true },
     { id: "activity", label: "Activity", show: can.viewActivity(user) },
     { id: "team", label: "Team", show: can.manageTeam(user) },
     { id: "account", label: "Account", show: !user.demo },
@@ -113,6 +115,7 @@ export function App() {
       {user.demo_workspace && <p className="notice">Demo workspace. Everything resets at midnight UTC.</p>}
       <main>
         {current === "board" && <Board user={user} team={team} />}
+        {current === "dashboard" && <DashboardPage />}
         {current === "activity" && <ActivityPage team={team} />}
         {current === "team" && <TeamPage me={user} team={team} setTeam={setTeam} />}
         {current === "account" && <AccountPage me={user} team={team} setTeam={setTeam} onDeleted={clearUser} />}

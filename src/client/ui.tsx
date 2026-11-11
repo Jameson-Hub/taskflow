@@ -1,5 +1,5 @@
 import { useCallback, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { MAX_LABEL_LENGTH, MAX_LABELS, normalizeLabel } from "../shared/domain";
+import { isoDate, MAX_LABEL_LENGTH, MAX_LABELS, normalizeLabel } from "../shared/domain";
 
 /** Runs an async action, keeping its error message for display. */
 export function useAction() {
@@ -39,6 +39,9 @@ export const initials = (name: string) =>
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+/** Today on the viewer's own calendar; due dates and "overdue" are measured against this. */
+export const localToday = () => isoDate(Date.now() - new Date().getTimezoneOffset() * 60_000);
 
 /** D1's datetime('now') is UTC without a zone suffix. */
 export const formatTimestamp = (sqlite: string) => new Date(sqlite + "Z").toLocaleString();
