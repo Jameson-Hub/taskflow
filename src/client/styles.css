@@ -289,6 +289,17 @@ label.check input {
   accent-color: var(--accent);
 }
 
+.invite-link {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.invite-link input {
+  flex: 1;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+}
+
 /* Honeypot: off-screen rather than display:none, which some bots skip. */
 .trap {
   position: absolute;

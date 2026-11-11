@@ -1,6 +1,8 @@
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { Context } from "hono";
 import { DAY_MS, type Role } from "../shared/domain";
+import { fail } from "./http";
+import { DEMO_WORKSPACE } from "./seed";
 
 export const SESSION_COOKIE = "sid";
 
@@ -36,18 +38,41 @@ export const SELECT_USER = `SELECT ${USER_COLUMNS} ${FROM_USERS}`;
 export const SELECT_USER_WITH_PASSWORD = `SELECT ${USER_COLUMNS}, u.password_hash ${FROM_USERS}`;
 
 export function publicUser(u: User) {
-  return { id: u.id, email: u.email, name: u.name, role: u.role, demo: u.is_demo === 1, workspace: u.workspace };
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    role: u.role,
+    /** One of the shared demo logins: its role and password are fixed. */
+    demo: u.is_demo === 1,
+    workspace: u.workspace,
+    /** In the public demo workspace, which resets nightly and has no invites. */
+    demo_workspace: u.workspace_id === DEMO_WORKSPACE,
+  };
 }
 
 const toHex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-async function sha256(value: string) {
+/** A secret for a cookie or link. Store only its `sha256`, so a leaked table can't be replayed. */
+export const newToken = () => toHex(crypto.getRandomValues(new Uint8Array(32)));
+
+export async function sha256(value: string) {
   return toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
+}
+
+/** Runs a batch that creates an account (sign-up, joining by invite); an email already registered becomes a 409. */
+export async function createAccount(db: D1Database, statements: D1PreparedStatement[]) {
+  try {
+    return await db.batch<User>(statements);
+  } catch (err) {
+    if (String(err).includes("UNIQUE")) fail(409, "That email is already registered. Sign in instead.");
+    throw err;
+  }
 }
 
 export async function startSession(c: Context, db: D1Database, userId: number, length: SessionLength) {
   const { days, persistent } = SESSION_LENGTHS[length];
-  const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
+  const token = newToken();
   const expires = new Date(Date.now() + days * DAY_MS);
   await db
     .prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
@@ -76,11 +101,6 @@ export function touchLastSeen(db: D1Database, user: User) {
   const today = new Date().toISOString().slice(0, 10);
   if (user.last_seen_at?.startsWith(today)) return null;
   return db.prepare("UPDATE users SET last_seen_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
-}
-
-/** Nightly: expired sessions already fail sign-in checks; this just stops them piling up. */
-export async function deleteExpiredSessions(db: D1Database) {
-  await db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(new Date().toISOString()).run();
 }
 
 /** Signs the user out everywhere except the browser making this request. */

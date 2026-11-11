@@ -67,6 +67,21 @@ export async function loginWithPassword({
   return api("/api/auth/login", { method: "POST", body: { email, password, remember }, ip });
 }
 
+/** Brings someone into the admin's workspace the way real workspaces do it: an invite link. */
+export async function addTeammate(adminCookie: string, { role, ...person }: typeof riley = riley) {
+  const invite = await api("/api/invites", { method: "POST", cookie: adminCookie, body: { role } });
+  if (invite.status !== 201) throw new Error(`invite failed: ${invite.status}`);
+  const { token } = (await invite.json()) as { token: string };
+  const joined = await api("/api/auth/join", { method: "POST", body: { token, ...person } });
+  if (joined.status !== 201) throw new Error(`join failed: ${joined.status}`);
+  return { id: ((await joined.clone().json()) as { id: number }).id, cookie: sessionCookie(joined) };
+}
+
+/** For tests that check what a job left behind in storage. */
+export async function count(sql: string) {
+  return (await env.DB.prepare(sql).first<{ n: number }>())?.n;
+}
+
 export async function getJson<T>(path: string, cookie: string) {
   return (await api(path, { cookie })).json() as Promise<T>;
 }
@@ -74,7 +89,7 @@ export async function getJson<T>(path: string, cookie: string) {
 /** The state a just-migrated database is in: only the (empty) demo workspace row. */
 export async function emptyDatabase() {
   await env.DB.batch([
-    ...["activity", "comments", "tasks", "sessions", "users"].map((table) => env.DB.prepare(`DELETE FROM ${table}`)),
+    ...["activity", "comments", "tasks", "sessions", "invites", "users"].map((table) => env.DB.prepare(`DELETE FROM ${table}`)),
     env.DB.prepare("DELETE FROM workspaces WHERE id <> ?").bind(DEMO_WORKSPACE),
   ]);
 }

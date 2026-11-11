@@ -54,6 +54,7 @@ account.delete("/", rateLimited, async (c) => {
       ).bind(new Date().toISOString(), me.id),
       c.env.DB.prepare("UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ?").bind(me.id),
       c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(me.id),
+      c.env.DB.prepare("DELETE FROM invites WHERE created_by = ?").bind(me.id),
     ]);
   }
   clearSessionCookie(c);

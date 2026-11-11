@@ -3,12 +3,18 @@ import { can as policy } from "../shared/policy";
 
 export type { Priority, Role, Status };
 
+export interface Invite {
+  workspace: string;
+  role: Role;
+}
+
 export interface User {
   id: number;
   email: string;
   name: string;
   role: Role;
   demo: boolean;
+  demo_workspace: boolean;
   workspace: string;
 }
 
@@ -71,6 +77,9 @@ export const api = {
   signup: (details: { name: string; email: string; password: string; workspace: string; website: string }) =>
     request<User>("POST", "/auth/signup", details),
   logout: () => request("POST", "/auth/logout"),
+  invite: (token: string) => request<Invite>("POST", "/auth/invite", { token }),
+  join: (details: { token: string; name: string; email: string; password: string }) => request<User>("POST", "/auth/join", details),
+  createInvite: (role: Role) => request<{ token: string; expires_at: string }>("POST", "/invites", { role }),
   changePassword: (current: string, next: string) => request("POST", "/me/password", { current, next }),
   deleteAccount: (password: string, deleteWorkspace: boolean) => request("DELETE", "/me", { password, deleteWorkspace }),
 

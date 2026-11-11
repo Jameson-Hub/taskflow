@@ -1,4 +1,4 @@
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { api, ROLE_LABEL, type Role, type User } from "./api";
 import { ErrorText, Options, useAction } from "./ui";
 
@@ -10,6 +10,24 @@ interface Props {
 
 export function TeamPage({ me, team, setTeam }: Props) {
   const { error, run } = useAction();
+  const [inviteLink, setInviteLink] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  function createInvite(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const role = new FormData(e.currentTarget).get("role") as Role;
+    run(async () => {
+      const { token } = await api.createInvite(role);
+      setInviteLink(`${location.origin}/#invite=${token}`);
+      setCopied(false);
+    });
+  }
+
+  const copyInvite = () =>
+    run(async () => {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+    });
 
   const changeRole = (member: User, role: Role) =>
     run(async () => {
@@ -74,33 +92,53 @@ export function TeamPage({ me, team, setTeam }: Props) {
         </tbody>
       </table>
 
-      <h2>Add a person</h2>
-      <form className="invite" onSubmit={invite}>
-        <label>
-          Name
-          <input name="name" required maxLength={80} />
-        </label>
-        <label>
-          Email
-          <input name="email" type="email" required />
-        </label>
-        <label>
-          Role
-          <select name="role" defaultValue="member">
-            <Options labels={ROLE_LABEL} />
-          </select>
-        </label>
-        <label>
-          Password
-          <input name="password" type="password" minLength={12} required autoComplete="new-password" />
-        </label>
-        <button className="primary">Add</button>
-      </form>
-      <p className="muted small">
-        {me.demo
-          ? "In the demo, use an @example.com address. New people can sign in with it until the nightly reset."
-          : "New people sign in with their email and password on the login page."}
-      </p>
+      {me.demo_workspace ? (
+        <>
+          <h2>Add a person</h2>
+          <form className="invite" onSubmit={invite}>
+            <label>
+              Name
+              <input name="name" required maxLength={80} />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" required />
+            </label>
+            <label>
+              Role
+              <select name="role" defaultValue="member">
+                <Options labels={ROLE_LABEL} />
+              </select>
+            </label>
+            <label>
+              Password
+              <input name="password" type="password" minLength={12} required autoComplete="new-password" />
+            </label>
+            <button className="primary">Add</button>
+          </form>
+          <p className="muted small">In the demo, use an @example.com address. New people can sign in with it until the nightly reset.</p>
+        </>
+      ) : (
+        <>
+          <h2>Invite someone</h2>
+          <form className="invite" onSubmit={createInvite}>
+            <label>
+              Role
+              <select name="role" defaultValue="member">
+                <Options labels={ROLE_LABEL} />
+              </select>
+            </label>
+            <button className="primary">Create invite link</button>
+          </form>
+          {inviteLink && (
+            <div className="invite-link">
+              <input readOnly value={inviteLink} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} />
+              <button onClick={copyInvite}>{copied ? "Copied" : "Copy"}</button>
+            </div>
+          )}
+          <p className="muted small">Send the link to one person. It works once, for 7 days, and they choose their own password.</p>
+        </>
+      )}
     </section>
   );
 }

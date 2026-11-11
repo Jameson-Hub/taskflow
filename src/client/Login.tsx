@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { api, ROLE_LABEL, type Role, type User } from "./api";
+import { useEffect, useState, type FormEvent } from "react";
+import { api, ROLE_LABEL, type Invite, type Role, type User } from "./api";
 import { ErrorText, useAction } from "./ui";
 
 const DEMOS: { role: Role; blurb: string }[] = [
@@ -8,7 +8,10 @@ const DEMOS: { role: Role; blurb: string }[] = [
   { role: "member", blurb: "Works on their own tasks" },
 ];
 
-type Mode = "demo" | "signin" | "signup";
+type Mode = "demo" | "signin" | "signup" | "join";
+
+/** Invite links look like `/#invite=<token>`; a fragment is never sent to the server. */
+export const inviteToken = () => new URLSearchParams(location.hash.slice(1)).get("invite");
 
 const MODES: { mode: Mode; label: string }[] = [
   { mode: "demo", label: "Try the demo" },
@@ -19,7 +22,16 @@ const MODES: { mode: Mode; label: string }[] = [
 export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
   const { error, setError, run } = useAction();
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<Mode>("demo");
+  const [token] = useState(inviteToken);
+  const [mode, setMode] = useState<Mode>(token ? "join" : "demo");
+  const [invite, setInvite] = useState<Invite | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    // Out of the address bar and history straight away, whether or not they join.
+    history.replaceState(null, "", location.pathname);
+    run(async () => setInvite(await api.invite(token)));
+  }, [token, run]);
 
   async function signIn(attempt: () => Promise<User>) {
     setBusy(true);
@@ -36,6 +48,19 @@ export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     signIn(() => api.login(String(form.get("email")), String(form.get("password")), form.has("remember")));
+  }
+
+  function submitJoin(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    signIn(() =>
+      api.join({
+        token: token ?? "",
+        name: String(form.get("name")),
+        email: String(form.get("email")),
+        password: String(form.get("password")),
+      }),
+    );
   }
 
   function submitSignUp(e: FormEvent<HTMLFormElement>) {
@@ -59,13 +84,32 @@ export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
           <img src="/favicon.svg" alt="" width={32} height={32} /> TaskFlow
         </h1>
 
-        <div className="segmented" role="tablist" aria-label="How to get in">
-          {MODES.map((m) => (
-            <button key={m.mode} role="tab" aria-selected={mode === m.mode} onClick={() => switchTo(m.mode)}>
-              {m.label}
+        {mode === "join" ? (
+          <form className="stack" onSubmit={submitJoin}>
+            {invite ? (
+              <p>
+                Join <strong>{invite.workspace}</strong> as {ROLE_LABEL[invite.role]}. Pick your own password.
+              </p>
+            ) : (
+              <p className="muted">{error ? "" : "Checking your invite…"}</p>
+            )}
+            <NewAccountFields />
+            <button className="primary" disabled={busy || !invite}>
+              Join workspace
             </button>
-          ))}
-        </div>
+            <button type="button" className="ghost" onClick={() => switchTo("signin")}>
+              I already have an account
+            </button>
+          </form>
+        ) : (
+          <div className="segmented" role="tablist" aria-label="How to get in">
+            {MODES.map((m) => (
+              <button key={m.mode} role="tab" aria-selected={mode === m.mode} onClick={() => switchTo(m.mode)}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {mode === "demo" && (
           <>
@@ -106,18 +150,7 @@ export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
         {mode === "signup" && (
           <form className="stack" onSubmit={submitSignUp}>
             <p className="muted small">You get your own private board and can add your team. Workspaces unused for 30 days are deleted.</p>
-            <label>
-              Your name
-              <input name="name" autoComplete="name" required maxLength={80} />
-            </label>
-            <label>
-              Email
-              <input name="email" type="email" autoComplete="email" required />
-            </label>
-            <label>
-              Password <span className="muted">(12+ characters)</span>
-              <input name="password" type="password" autoComplete="new-password" minLength={12} required />
-            </label>
+            <NewAccountFields />
             <label>
               Workspace name
               <input name="workspace" placeholder="e.g. Acme Design" required maxLength={80} />
@@ -135,5 +168,25 @@ export function Login({ onSignedIn }: { onSignedIn: (user: User) => void }) {
         <ErrorText error={error} />
       </div>
     </div>
+  );
+}
+
+/** What someone picks for themselves, whether creating a workspace or joining one. */
+function NewAccountFields() {
+  return (
+    <>
+      <label>
+        Your name
+        <input name="name" autoComplete="name" required maxLength={80} />
+      </label>
+      <label>
+        Email
+        <input name="email" type="email" autoComplete="email" required />
+      </label>
+      <label>
+        Password <span className="muted">(12+ characters)</span>
+        <input name="password" type="password" autoComplete="new-password" minLength={12} required />
+      </label>
+    </>
   );
 }

@@ -3,7 +3,7 @@ import { AccountPage } from "./AccountPage";
 import { ActivityPage } from "./ActivityPage";
 import { api, can, ROLE_LABEL, whenSessionExpires, type User } from "./api";
 import { Board } from "./Board";
-import { Login } from "./Login";
+import { inviteToken, Login } from "./Login";
 import { TeamPage } from "./TeamPage";
 
 const PAGES = ["board", "activity", "team", "account"] as const;
@@ -18,6 +18,8 @@ export function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [team, setTeam] = useState<User[]>([]);
   const [page, setPage] = useState<Page>(pageFromHash);
+  // An invite link opened while signed in: offer to sign out and join rather than ignore it.
+  const [invitePending, setInvitePending] = useState(() => inviteToken() !== null);
 
   useEffect(() => {
     api.me().then(setUser, () => setUser(null));
@@ -35,6 +37,32 @@ export function App() {
 
   if (user === undefined) return <div className="splash" aria-busy="true" />;
   if (user === null) return <Login onSignedIn={setUser} />;
+  if (invitePending) {
+    const dismiss = () => {
+      history.replaceState(null, "", location.pathname);
+      setInvitePending(false);
+    };
+    const signOutAndJoin = async () => {
+      await api.logout();
+      setInvitePending(false);
+      setUser(null); // Login picks the invite up from the address bar.
+    };
+    return (
+      <div className="login">
+        <div className="login-card stack">
+          <p>
+            This is an invite link, but you're signed in as <strong>{user.name}</strong>. Sign out to join with a new account.
+          </p>
+          <button className="primary" onClick={signOutAndJoin}>
+            Sign out and join
+          </button>
+          <button className="ghost" onClick={dismiss}>
+            Stay signed in
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const tabs: { id: Page; label: string; show: boolean }[] = [
     { id: "board", label: "Board", show: true },
@@ -82,7 +110,7 @@ export function App() {
           </button>
         </div>
       </header>
-      {user.demo && <p className="notice">Demo workspace. Everything resets at midnight UTC.</p>}
+      {user.demo_workspace && <p className="notice">Demo workspace. Everything resets at midnight UTC.</p>}
       <main>
         {current === "board" && <Board user={user} team={team} />}
         {current === "activity" && <ActivityPage team={team} />}

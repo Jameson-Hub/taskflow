@@ -50,6 +50,12 @@ export async function resetDemo(db: D1Database) {
   ]);
 }
 
+/** Expired sessions and invites already don't work; this just stops them piling up. */
+export async function deleteExpired(db: D1Database) {
+  const now = new Date().toISOString();
+  await db.batch(["sessions", "invites"].map((table) => db.prepare(`DELETE FROM ${table} WHERE expires_at <= ?`).bind(now)));
+}
+
 /** Deletes real workspaces nobody has used for 30 days, so abandoned and spam sign-ups clear themselves. */
 export async function deleteInactiveWorkspaces(db: D1Database) {
   const cutoff = new Date(Date.now() - INACTIVE_DAYS * DAY_MS).toISOString();

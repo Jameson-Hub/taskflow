@@ -21,6 +21,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 - **Activity log** recording who created, changed, moved, deleted or commented on what, and role changes
 - **Comments, due dates, priorities**, search and filters
 - **Sign up for a private workspace**: you become its admin and add your team. Workspaces are fully isolated from each other.
+- **Invite links**: an admin creates a single-use link for a role, valid for 7 days, and the person joining picks their own password.
 - **Account settings**: change your password (signs you out everywhere else) or delete your account. A deleted account is anonymised, so the board, comments and activity history stay intact; the last admin leaving deletes the workspace, after confirming.
 - **One-click demo logins** for a shared demo board that resets nightly
 

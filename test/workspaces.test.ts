@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, emptyDatabase, freshDatabase, getJson, loginWithPassword, loginAs, riley, runNightlyReset, sessionCookie, signUp } from "./helpers";
+import { addTeammate, api, count, emptyDatabase, freshDatabase, getJson, loginWithPassword, loginAs, riley, runNightlyReset, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
 
@@ -47,13 +47,9 @@ describe("workspace isolation", () => {
     expect((await api("/api/users/3", { method: "PATCH", cookie: anaCookie, body: { role: "admin" } })).status).toBe(404);
   });
 
-  it("puts people an admin adds into the admin's own workspace", async () => {
+  it("puts people an admin invites into the admin's own workspace", async () => {
     const anaCookie = sessionCookie(await signUp());
-    await api("/api/users", {
-      method: "POST",
-      cookie: anaCookie,
-      body: { email: "ben@example.com", name: "Ben Ong", role: "member", password: "another long password" },
-    });
+    await addTeammate(anaCookie, { email: "ben@example.com", name: "Ben Ong", role: "member", password: "another long password" });
     expect((await getJson<{ email: string }[]>("/api/users", anaCookie)).map((u) => u.email)).toEqual(["ana@example.com", "ben@example.com"]);
   });
 });
@@ -79,7 +75,6 @@ describe("nightly job", () => {
 
     expect((await loginWithPassword()).status).toBe(401);
     expect((await loginWithPassword({ email: "active@example.com" })).status).toBe(200);
-    const count = async (sql: string) => (await env.DB.prepare(sql).first<{ n: number }>())?.n;
     // Ana's workspace is gone without a trace.
     expect(await count("SELECT COUNT(*) AS n FROM tasks WHERE title = 'Ana''s private task'")).toBe(0);
     expect(await count("SELECT COUNT(*) AS n FROM comments")).toBe(0);
@@ -92,9 +87,7 @@ describe("nightly job", () => {
   });
 
   it("doesn't count deleted accounts as activity", async () => {
-    const anaCookie = sessionCookie(await signUp());
-    await api("/api/users", { method: "POST", cookie: anaCookie, body: riley });
-    const rileyCookie = sessionCookie(await loginWithPassword({ email: riley.email, password: riley.password }));
+    const { cookie: rileyCookie } = await addTeammate(sessionCookie(await signUp()));
     expect((await api("/api/me", { method: "DELETE", cookie: rileyCookie, body: { password: riley.password } })).status).toBe(200);
     await env.DB.prepare("UPDATE users SET last_seen_at = '2020-01-01T00:00:00.000Z', created_at = '2020-01-01 00:00:00' WHERE email = ?")
       .bind("ana@example.com")
@@ -105,6 +98,17 @@ describe("nightly job", () => {
     expect((await loginWithPassword()).status).toBe(401);
   });
 
+  it("clears out expired invites", async () => {
+    const cookie = sessionCookie(await signUp());
+    await api("/api/invites", { method: "POST", cookie, body: { role: "member" } });
+    await env.DB.prepare("UPDATE invites SET expires_at = '2020-01-01T00:00:00.000Z'").run();
+    await api("/api/invites", { method: "POST", cookie, body: { role: "member" } });
+
+    await runNightlyReset();
+
+    expect(await count("SELECT COUNT(*) AS n FROM invites")).toBe(1);
+  });
+
   it("clears out expired sessions and keeps live ones", async () => {
     const expired = sessionCookie(await signUp());
     await env.DB.prepare("UPDATE sessions SET expires_at = '2020-01-01T00:00:00.000Z'").run();
@@ -112,8 +116,7 @@ describe("nightly job", () => {
 
     await runNightlyReset();
 
-    const sessions = await env.DB.prepare("SELECT COUNT(*) AS n FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email = 'ana@example.com'").first<{ n: number }>();
-    expect(sessions?.n).toBe(1);
+    expect(await count("SELECT COUNT(*) AS n FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email = 'ana@example.com'")).toBe(1);
     expect((await api("/api/me", { cookie: fresh })).status).toBe(200);
     expect((await api("/api/me", { cookie: expired })).status).toBe(401);
   });
@@ -130,14 +133,15 @@ describe("fresh database", () => {
 });
 
 describe("rate limiting", () => {
-  // Ten attempts a minute get their normal answer; the eleventh is refused.
+  // Ten attempts a minute get their normal answer, then they're refused. The limiter counts in
+  // fixed one-minute windows, so allow for a window starting mid-loop: some later attempt is refused.
   it.each([
     ["sign-ups", (i: number) => signUp({ email: `bot${i}@example.com` }, "203.0.113.10"), 201],
     ["logins", () => loginWithPassword({ email: "x@example.com", password: "nope", ip: "203.0.113.9" }), 401],
   ] as const)("blocks rapid repeated %s from one address", async (_, attempt, normal) => {
     const statuses = [];
-    for (let i = 0; i < 11; i++) statuses.push((await attempt(i)).status);
+    for (let i = 0; i < 21; i++) statuses.push((await attempt(i)).status);
     expect(statuses.slice(0, 10)).toEqual(Array(10).fill(normal));
-    expect(statuses[10]).toBe(429);
+    expect(statuses.slice(10)).toContain(429);
   });
 });

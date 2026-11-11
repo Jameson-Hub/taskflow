@@ -6,11 +6,12 @@ import { activity } from "./activity";
 import { comments } from "./comments";
 import { account } from "./account";
 import { fail, rateLimited, readBody, type AppEnv } from "./http";
+import { inviteAuth, invites } from "./invites";
 import { hashPassword, verifyPassword } from "./password";
-import { DEMO_WORKSPACE, deleteInactiveWorkspaces, resetDemo } from "./seed";
-import { deleteExpiredSessions, endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
+import { DEMO_WORKSPACE, deleteExpired, deleteInactiveWorkspaces, resetDemo } from "./seed";
+import { createAccount, endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
 import { tasks } from "./tasks";
-import { newUser, roleBody, users } from "./users";
+import { accountDetails, roleBody, users } from "./users";
 
 const app = new Hono<AppEnv>().basePath("/api");
 
@@ -54,29 +55,22 @@ app.post("/auth/demo", async (c) => {
   return c.json(publicUser(user));
 });
 
-const signup = newUser.pick({ name: true, email: true, password: true }).extend({
+const signup = accountDetails.extend({
   workspace: z.string().trim().min(1).max(80),
   website: z.literal("").optional(),
 });
 
 app.post("/auth/signup", rateLimited, async (c) => {
   const { name, email, password, workspace } = await readBody(c, signup, "Check your name, email, workspace name and a password of 12+ characters");
-  const hash = await hashPassword(password);
-  let user: User;
-  try {
-    // One transaction: if the email is taken, the workspace insert rolls back too.
-    const results = await c.env.DB.batch<User>([
-      c.env.DB.prepare("INSERT INTO workspaces (name) VALUES (?)").bind(workspace),
-      c.env.DB.prepare(
-        "INSERT INTO users (email, name, role, password_hash, workspace_id, last_seen_at) VALUES (?, ?, 'admin', ?, last_insert_rowid(), ?)",
-      ).bind(email, name, hash, new Date().toISOString()),
-      c.env.DB.prepare(`${SELECT_USER} WHERE u.id = last_insert_rowid()`),
-    ]);
-    user = results.at(-1)!.results[0]!;
-  } catch (err) {
-    if (String(err).includes("UNIQUE")) fail(409, "That email is already registered. Sign in instead.");
-    throw err;
-  }
+  // One transaction: if the email is taken, the workspace insert rolls back too.
+  const results = await createAccount(c.env.DB, [
+    c.env.DB.prepare("INSERT INTO workspaces (name) VALUES (?)").bind(workspace),
+    c.env.DB.prepare(
+      "INSERT INTO users (email, name, role, password_hash, workspace_id, last_seen_at) VALUES (?, ?, 'admin', ?, last_insert_rowid(), ?)",
+    ).bind(email, name, await hashPassword(password), new Date().toISOString()),
+    c.env.DB.prepare(`${SELECT_USER} WHERE u.id = last_insert_rowid()`),
+  ]);
+  const user = results.at(-1)!.results[0]!;
   await startSession(c, c.env.DB, user.id, "standard");
   return c.json(publicUser(user), 201);
 });
@@ -96,6 +90,8 @@ app.post("/auth/login", rateLimited, async (c) => {
   return c.json(publicUser(user));
 });
 
+app.route("/auth", inviteAuth);
+
 app.post("/auth/logout", async (c) => {
   await endSession(c, c.env.DB);
   return c.json({ ok: true });
@@ -106,6 +102,7 @@ app.use("/*", requireUser);
 app.route("/me", account);
 
 app.route("/users", users);
+app.route("/invites", invites);
 app.route("/tasks", tasks);
 app.route("/tasks/:taskId{[0-9]+}/comments", comments);
 app.route("/activity", activity);
@@ -113,6 +110,6 @@ app.route("/activity", activity);
 export default {
   fetch: app.fetch,
   async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(Promise.all([resetDemo(env.DB), deleteInactiveWorkspaces(env.DB), deleteExpiredSessions(env.DB)]));
+    ctx.waitUntil(Promise.all([resetDemo(env.DB), deleteInactiveWorkspaces(env.DB), deleteExpired(env.DB)]));
   },
 } satisfies ExportedHandler<Env>;
