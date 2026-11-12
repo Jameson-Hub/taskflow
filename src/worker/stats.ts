@@ -22,6 +22,8 @@ const countsFor = <K extends string>(keys: readonly K[], rows: KeyCount[]) =>
   Object.fromEntries(keys.map((k) => [k, rows.find((r) => r.key === k)?.n ?? 0])) as Record<K, number>;
 
 const toAttentionTask = ({ assignee_id, assignee_name, ...rest }: AttentionRow) => ({ ...rest, assignee: assigneeOf(assignee_id, assignee_name) });
+/** The first few rows of a list, with how many match in all. */
+const attentionList = (result: D1Result, total: number) => ({ tasks: (result.results as AttentionRow[]).map(toAttentionTask), total });
 
 stats.get("/", async (c) => {
   const db = c.env.DB;
@@ -38,6 +40,9 @@ stats.get("/", async (c) => {
   const scope = [me.workspace_id, mine ? 1 : 0, me.id];
   const OPEN = `${SCOPE} AND ${IS_OPEN}`;
   const ATTENTION = `SELECT t.id, t.title, t.due_date, t.assignee_id, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE ${OPEN}`;
+  // Untouched for a while but not already overdue. ?4 is today, ?5 how far back counts as a while.
+  const STALE = `t.updated_at < datetime('now', ?5) AND (t.due_date IS NULL OR t.due_date >= ?4)`;
+  const staleSince = `-${STALE_DAYS} days`;
 
   // Finished tasks in the trend window (calendar day of completion, UTC), by week back from today: 0 = this week.
   // No upper bound: for a viewer behind UTC, something finished this evening is already "tomorrow" in UTC.
@@ -49,10 +54,11 @@ stats.get("/", async (c) => {
     db.prepare(`SELECT priority AS key, COUNT(*) AS n FROM tasks t WHERE ${OPEN} GROUP BY priority`).bind(...scope),
     db
       .prepare(
-        `SELECT COUNT(CASE WHEN due_date < ?4 THEN 1 END) AS overdue, COUNT(CASE WHEN due_date >= ?4 AND due_date < ?5 THEN 1 END) AS due_soon
+        `SELECT COUNT(CASE WHEN due_date < ?4 THEN 1 END) AS overdue, COUNT(CASE WHEN due_date >= ?4 AND due_date < ?6 THEN 1 END) AS due_soon,
+                COUNT(CASE WHEN ${STALE} THEN 1 END) AS stale
          FROM tasks t WHERE ${OPEN}`,
       )
-      .bind(...scope, today, plusDays(DUE_SOON_WINDOW_DAYS)),
+      .bind(...scope, today, staleSince, plusDays(DUE_SOON_WINDOW_DAYS)),
     db
       .prepare(
         `SELECT t.assignee_id AS id, COALESCE(u.name, 'Unassigned') AS name, COUNT(*) AS open, COUNT(CASE WHEN t.due_date < ?4 THEN 1 END) AS overdue
@@ -67,12 +73,7 @@ stats.get("/", async (c) => {
       )
       .bind(...scope, TOP_LABELS),
     db.prepare(`${ATTENTION} AND t.due_date < ?4 ORDER BY t.due_date, t.id LIMIT ?5`).bind(...scope, today, ATTENTION_LIMIT),
-    // Untouched for a while but not already in the overdue list.
-    db
-      .prepare(
-        `${ATTENTION} AND t.updated_at < datetime('now', ?4) AND (t.due_date IS NULL OR t.due_date >= ?5) ORDER BY t.updated_at, t.id LIMIT ?6`,
-      )
-      .bind(...scope, `-${STALE_DAYS} days`, today, ATTENTION_LIMIT),
+    db.prepare(`${ATTENTION} AND ${STALE} ORDER BY t.updated_at, t.id LIMIT ?6`).bind(...scope, today, staleSince, ATTENTION_LIMIT),
     db
       .prepare(`SELECT due_date AS key, COUNT(*) AS n FROM tasks t WHERE ${OPEN} AND due_date >= ?4 AND due_date < ?5 GROUP BY due_date`)
       .bind(...scope, today, plusDays(UPCOMING_DAYS)),
@@ -88,6 +89,7 @@ stats.get("/", async (c) => {
   ]);
 
   const by_status = countsFor(STATUSES, byStatus!.results as KeyCount[]);
+  const deadlineCounts = deadlines!.results[0] as { overdue: number; due_soon: number; stale: number };
   const dueOn = new Map((upcoming!.results as KeyCount[]).map((r) => [r.key, r.n]));
   const weeks = finishedByWeek!.results as { key: number; n: number; days: number }[];
   const weeksBack = new Map(weeks.map((r) => [r.key, r.n]));
@@ -96,15 +98,13 @@ stats.get("/", async (c) => {
   const body: Stats = {
     open: OPEN_STATUSES.reduce((sum, s) => sum + by_status[s], 0),
     done: by_status.done,
-    ...(deadlines!.results[0] as Pick<Stats, "overdue" | "due_soon">),
+    overdue: deadlineCounts.overdue,
+    due_soon: deadlineCounts.due_soon,
     by_status,
     by_priority: countsFor(PRIORITIES, byPriority!.results as KeyCount[]),
     workload: workload!.results as Workload[],
     labels: labels!.results as LabelCount[],
-    attention: {
-      overdue: (overdue!.results as AttentionRow[]).map(toAttentionTask),
-      stale: (stale!.results as AttentionRow[]).map(toAttentionTask),
-    },
+    attention: { overdue: attentionList(overdue!, deadlineCounts.overdue), stale: attentionList(stale!, deadlineCounts.stale) },
     upcoming: Array.from({ length: UPCOMING_DAYS }, (_, i) => plusDays(i)).map((date) => ({ date, count: dueOn.get(date) ?? 0 })),
     completed: Array.from({ length: TREND_WEEKS }, (_, i) => {
       const back = TREND_WEEKS - 1 - i;

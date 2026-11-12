@@ -314,6 +314,19 @@ test("an open board whose session ends returns to sign-in and says why", async (
   await expect(page.getByText(/The demo was reset/)).toHaveCount(0);
 });
 
+test("the dashboard's attention lists say how many more there are", async ({ page }) => {
+  await signUp(page, `Busy ${unique()}`);
+  const origin = new URL(page.url()).origin;
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+  for (let i = 1; i <= 12; i++) {
+    const res = await page.request.post("/api/tasks", { data: { title: `Late ${i}`, due_date: daysAgo(i) }, headers: { Origin: origin } });
+    expect(res.ok()).toBe(true);
+  }
+  await page.getByRole("link", { name: "Dashboard" }).click();
+  await expect(page.getByText("Late 12")).toBeVisible();
+  await expect(page.getByText("+2 more")).toBeVisible();
+});
+
 test("the theme follows the system until you pick one, and your pick sticks", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { PRIORITIES, STALE_DAYS, STATUSES, TREND_WEEKS, UPCOMING_DAYS, type AttentionTask, type Stats } from "../shared/domain";
+import { PRIORITIES, STALE_DAYS, STATUSES, TREND_WEEKS, UPCOMING_DAYS, type AttentionList, type Stats } from "../shared/domain";
 import { api, PRIORITY_LABEL, STATUS_LABEL, type User } from "./api";
 import { boardLink, dayOf, dueLabel, ErrorText, LabelChip, localToday, longDate, shortDate, useAction } from "./ui";
 
@@ -45,9 +45,9 @@ export function DashboardPage({ me }: { me: User }) {
       ) : (
         <div className="charts">
           <Chart title="Needs attention">
-            <AttentionList title="Overdue" tasks={stats.attention.overdue} showDue />
-            <AttentionList title={`Untouched for ${STALE_DAYS} days`} tasks={stats.attention.stale} />
-            {stats.attention.overdue.length + stats.attention.stale.length === 0 && <p className="muted small">All clear.</p>}
+            <AttentionTasks title="Overdue" list={stats.attention.overdue} showDue />
+            <AttentionTasks title={`Untouched for ${STALE_DAYS} days`} list={stats.attention.stale} />
+            {stats.attention.overdue.total + stats.attention.stale.total === 0 && <p className="muted small">All clear.</p>}
           </Chart>
 
           <Chart title={`Due in the next ${UPCOMING_DAYS} days`}>
@@ -184,7 +184,7 @@ function BarRow({ href, title, children }: { href?: string; title: string; child
   );
 }
 
-function AttentionList({ title, tasks, showDue = false }: { title: string; tasks: AttentionTask[]; showDue?: boolean }) {
+function AttentionTasks({ title, list: { tasks, total }, showDue = false }: { title: string; list: AttentionList; showDue?: boolean }) {
   if (tasks.length === 0) return null;
   return (
     <div className="attention">
@@ -200,6 +200,7 @@ function AttentionList({ title, tasks, showDue = false }: { title: string; tasks
           </li>
         ))}
       </ul>
+      {total > tasks.length && <p className="muted small">+{total - tasks.length} more</p>}
     </div>
   );
 }

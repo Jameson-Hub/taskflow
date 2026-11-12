@@ -55,7 +55,7 @@ describe("dashboard stats", () => {
     const s = await stats(sessionCookie(await signUp()));
     expect(s).toMatchObject({ open: 0, done: 0, overdue: 0, due_soon: 0, by_status: { todo: 0, in_progress: 0, done: 0 }, labels: [] });
     expect(s.workload).toEqual([]);
-    expect(s.attention).toEqual({ overdue: [], stale: [] });
+    expect(s.attention).toEqual({ overdue: { tasks: [], total: 0 }, stale: { tasks: [], total: 0 } });
     expect(s.completed.every((w) => w.count === 0)).toBe(true);
     expect(s.upcoming.every((d) => d.count === 0)).toBe(true);
   });
@@ -74,8 +74,8 @@ describe("needs attention", () => {
     await api("/api/tasks", { method: "POST", cookie, body: { title: "Very late", due_date: day(-5) } });
     await api("/api/tasks", { method: "POST", cookie, body: { title: "Late but done", due_date: day(-5), status: "done" } });
     const { attention } = await stats(cookie);
-    expect(attention.overdue.map((t) => t.title)).toEqual(["Very late", "A bit late"]);
-    expect(attention.overdue[0]).toMatchObject({ due_date: day(-5), assignee: null });
+    expect(attention.overdue.tasks.map((t) => t.title)).toEqual(["Very late", "A bit late"]);
+    expect(attention.overdue.tasks[0]).toMatchObject({ due_date: day(-5), assignee: null });
   });
 
   it("lists open tasks nobody has touched in 14 days", async () => {
@@ -83,12 +83,41 @@ describe("needs attention", () => {
     await env.DB.prepare("UPDATE tasks SET updated_at = datetime('now', '-15 days') WHERE title IN ('Audit role permissions', 'Customer interview notes')").run();
     const { attention } = await stats(cookie);
     // The done one doesn't need attention.
-    expect(attention.stale.map((t) => t.title)).toEqual(["Audit role permissions"]);
+    expect(attention.stale.tasks.map((t) => t.title)).toEqual(["Audit role permissions"]);
+    expect(attention.stale.total).toBe(1);
+  });
+
+  it("shows the first 10 of a long list, with how many there are in all", async () => {
+    const cookie = await loginAs("manager");
+    for (let i = 1; i <= 12; i++) await api("/api/tasks", { method: "POST", cookie, body: { title: `Late ${i}`, due_date: day(-i) } });
+    const { attention } = await stats(cookie);
+    expect(attention.overdue.tasks).toHaveLength(10);
+    expect(attention.overdue.tasks[0]!.title).toBe("Late 12");
+    expect(attention.overdue.total).toBe(12);
+  });
+});
+
+describe("how many need attention", () => {
+  it("counts every untouched task, leaving out overdue ones and following 'just me'", async () => {
+    const manager = await loginAs("manager");
+    const team = await getJson<{ id: number; name: string }[]>("/api/users", manager);
+    const sam = team.find((u) => u.name === "Sam Cruz")!;
+    for (let i = 1; i <= 12; i++) await api("/api/tasks", { method: "POST", cookie: manager, body: { title: `Old ${i}`, assignee_id: sam.id } });
+    await api("/api/tasks", { method: "POST", cookie: manager, body: { title: "Old and late", assignee_id: sam.id, due_date: day(-1) } });
+    await env.DB.prepare("UPDATE tasks SET updated_at = datetime('now', '-15 days') WHERE title LIKE 'Old%'").run();
+
+    const { attention } = await stats(manager);
+    expect(attention.stale.tasks).toHaveLength(10);
+    expect(attention.stale.total).toBe(12); // "Old and late" is in the overdue list instead
+    expect(attention.overdue.tasks.map((t) => t.title)).toEqual(["Old and late"]);
+
+    expect((await stats(await loginAs("member"), day(0), { mine: true })).attention.stale.total).toBe(12);
+    expect((await stats(manager, day(0), { mine: true })).attention.stale.total).toBe(0);
   });
 });
 
 describe("what counts as touching a task", () => {
-  const staleTitles = async (cookie: string) => (await stats(cookie)).attention.stale.map((t) => t.title);
+  const staleTitles = async (cookie: string) => (await stats(cookie)).attention.stale.tasks.map((t) => t.title);
 
   it("a comment does; dragging it within its column doesn't", async () => {
     const cookie = await loginAs("manager");

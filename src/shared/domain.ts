@@ -55,8 +55,8 @@ export interface Stats {
   by_priority: Record<Priority, number>;
   workload: { id: number | null; name: string; open: number; overdue: number }[];
   labels: { name: string; count: number }[];
-  /** Open tasks to look at: past their due date, or untouched for STALE_DAYS. */
-  attention: { overdue: AttentionTask[]; stale: AttentionTask[] };
+  /** Open tasks to look at: past their due date, or untouched for STALE_DAYS (and not overdue). */
+  attention: { overdue: AttentionList; stale: AttentionList };
   /** Open tasks due on each of the next UPCOMING_DAYS days, starting today. */
   upcoming: { date: string; count: number }[];
   /** Tasks finished in each of the last TREND_WEEKS 7-day weeks, oldest first; the last one ends today. */
@@ -64,6 +64,9 @@ export interface Stats {
   /** Average days from created to finished, for tasks finished in those weeks; null if none. */
   avg_days_to_done: number | null;
 }
+
+/** The first few tasks of a list, most urgent first, and how many there are in all. */
+export type AttentionList = { tasks: AttentionTask[]; total: number };
 
 export interface AttentionTask {
   id: number;
