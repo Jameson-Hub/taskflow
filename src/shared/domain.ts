@@ -31,6 +31,8 @@ export const MAX_COMMENT = 2000;
 export const MAX_MENTIONS = 20;
 export const MAX_CHECKLIST_TEXT = 200;
 export type ChecklistItem = { text: string; done: boolean };
+/** "2/5": ticked items out of all of them. */
+export const checklistProgress = (items: ChecklistItem[]) => `${items.filter((i) => i.done).length}/${items.length}`;
 /** Labels are compared and stored like this, so "Bug " and "bug" are the same label. */
 export const normalizeLabel = (label: string) => label.trim().toLowerCase();
 
@@ -38,6 +40,10 @@ export type Role = (typeof ROLES)[number];
 export type Status = (typeof STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
 export type Action = (typeof ACTIONS)[number];
+
+export const STATUS_LABEL: Record<Status, string> = { todo: "To do", in_progress: "In progress", done: "Done" };
+export const PRIORITY_LABEL: Record<Priority, string> = { high: "High", medium: "Medium", low: "Low" };
+export const ROLE_LABEL: Record<Role, string> = { admin: "Admin", manager: "Manager", member: "Member" };
 
 /** GET /api/stats */
 export interface Stats {
@@ -64,4 +70,21 @@ export interface AttentionTask {
   title: string;
   due_date: string | null;
   assignee: { id: number; name: string } | null;
+}
+
+/** A task as the API returns it (GET /api/tasks). */
+export interface Task {
+  id: number;
+  title: string;
+  description: string;
+  status: Status;
+  priority: Priority;
+  position: number;
+  due_date: string | null;
+  assignee: { id: number; name: string } | null;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+  labels: string[];
+  checklist: ChecklistItem[];
 }

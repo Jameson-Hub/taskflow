@@ -1,5 +1,6 @@
 import { useCallback, useState, type CSSProperties, type KeyboardEvent } from "react";
 import {
+  checklistProgress,
   DAY_MS,
   isoDate,
   MAX_CHECKLIST,
@@ -149,9 +150,6 @@ export function LabelInput({ value, known, onChange }: { value: string[]; known:
     </div>
   );
 }
-
-/** "2/5": how much of a checklist is done. */
-export const checklistProgress = (items: ChecklistItem[]) => `${items.filter((i) => i.done).length}/${items.length}`;
 
 /** Editable checklist: tick, remove, and add items (Enter). Changes save with the task. */
 export function Checklist({ items, onChange }: { items: ChecklistItem[]; onChange: (items: ChecklistItem[]) => void }) {

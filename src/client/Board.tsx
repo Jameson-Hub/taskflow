@@ -4,8 +4,9 @@ import { onBoardChange } from "./live";
 import { beforeSignOut } from "./signOut";
 import { byBoardOrder, columnOf, keyboardMove, placeAt, type Direction } from "../shared/moves";
 import { TaskDrawer } from "./TaskDrawer";
-import { STATUSES } from "../shared/domain";
-import { checklistProgress, dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
+import { checklistProgress, STATUSES } from "../shared/domain";
+import { downloadCsv } from "./csv";
+import { dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
 
 const UNDO_MS = 10_000;
 const ARROWS: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
@@ -249,6 +250,9 @@ export function Board({ user, team }: { user: User; team: User[] }) {
           />{" "}
           Mentions me
         </label>
+        <button onClick={() => downloadCsv(tasks)} disabled={tasks.length === 0} title="Download the tasks shown as a spreadsheet">
+          Export CSV
+        </button>
         <button className="primary" onClick={() => setOpen("new")} aria-keyshortcuts="N" title="New task (N)">
           + New task
         </button>

@@ -1,7 +1,7 @@
-import type { Action, ChecklistItem, Priority, Role, Stats, Status } from "../shared/domain";
+import type { Action, Priority, Role, Stats, Status, Task } from "../shared/domain";
 import { can as policy } from "../shared/policy";
 
-export type { Priority, Role, Status };
+export type { Priority, Role, Status, Task };
 
 export interface Invite {
   workspace: string;
@@ -16,22 +16,6 @@ export interface User {
   demo: boolean;
   demo_workspace: boolean;
   workspace: string;
-}
-
-export interface Task {
-  id: number;
-  title: string;
-  description: string;
-  status: Status;
-  priority: Priority;
-  position: number;
-  due_date: string | null;
-  assignee: { id: number; name: string } | null;
-  created_by: number;
-  created_at: string;
-  updated_at: string;
-  labels: string[];
-  checklist: ChecklistItem[];
 }
 
 export interface Comment {
@@ -117,6 +101,4 @@ export const can = {
   deleteComment: (u: User, c: Comment) => policy.deleteComment(u, c.author.id),
 };
 
-export const STATUS_LABEL: Record<Status, string> = { todo: "To do", in_progress: "In progress", done: "Done" };
-export const PRIORITY_LABEL: Record<Priority, string> = { high: "High", medium: "Medium", low: "Low" };
-export const ROLE_LABEL: Record<Role, string> = { admin: "Admin", manager: "Manager", member: "Member" };
+export { PRIORITY_LABEL, ROLE_LABEL, STATUS_LABEL } from "../shared/domain";

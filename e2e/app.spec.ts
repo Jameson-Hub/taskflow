@@ -162,6 +162,26 @@ test("@mentions suggest teammates, are highlighted, and drive the 'Mentions me' 
   await expect(page.getByText("Nobody mentioned here")).toHaveCount(0);
 });
 
+test("the board downloads as a CSV of what the filters show", async ({ page }) => {
+  await signUp(page, `CSV ${unique()}`);
+  for (const [title, priority] of [["Ship it, today", "high"], ["Later maybe", "low"]] as const) {
+    await page.getByRole("button", { name: "+ New task" }).click();
+    await page.getByLabel("Title").fill(title);
+    await page.getByRole("dialog").getByLabel("Priority").selectOption(priority);
+    await page.getByRole("button", { name: "Create task" }).click();
+    await expect(page.getByText(title)).toBeVisible();
+  }
+  await page.getByLabel("Priority").selectOption("high");
+  await expect(page.getByText("Later maybe")).toHaveCount(0);
+
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export CSV" }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^taskflow-\d{4}-\d{2}-\d{2}\.csv$/);
+  const csv = (await (await download.createReadStream()).toArray()).join("");
+  const rows = csv.replace(/^\uFEFF/, "").split("\r\n");
+  expect(rows[0]).toMatch(/^Title,Status,Priority/);
+  expect(rows.slice(1)).toEqual([expect.stringMatching(/^"Ship it, today",To do,High,/)]);
+});
+
 test("it can be installed, and fits a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ROLE_LABEL, STATUS_LABEL, type ActivityEntry, type Role, type Status, type User } from "./api";
-import type { ChecklistItem } from "../shared/domain";
-import { checklistProgress, formatTimestamp } from "./ui";
+import { checklistProgress, type ChecklistItem } from "../shared/domain";
+import { formatTimestamp } from "./ui";
 
 const FIELD_LABEL: Record<string, string> = {
   title: "title",
