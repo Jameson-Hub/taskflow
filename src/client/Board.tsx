@@ -344,7 +344,13 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                 })}
               </ul>
               {cards.length === 0 && (
-                <p className="empty">{tasks.length === 0 && status === "todo" ? "Your board is empty. Add your first task." : "Nothing here yet"}</p>
+                <p className="empty">
+                  {tasks.length > 0 || status !== "todo"
+                    ? "Nothing here yet"
+                    : Object.values(filters).some(Boolean)
+                      ? "No tasks match these filters."
+                      : "Your board is empty. Add your first task."}
+                </p>
               )}
             </section>
           );

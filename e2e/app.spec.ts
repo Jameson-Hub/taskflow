@@ -147,6 +147,12 @@ test("@mentions suggest teammates, are highlighted, and drive the 'Mentions me' 
     await page.getByRole("button", { name: "Create task" }).click();
   }
 
+  // Nothing matches yet: the board says so, rather than calling itself empty.
+  await page.getByLabel("Mentions me").check();
+  await expect(page.getByText("No tasks match these filters")).toBeVisible();
+  await expect(page.getByText("Your board is empty")).toHaveCount(0);
+  await page.getByLabel("Mentions me").uncheck();
+
   await page.getByRole("region", { name: "To do" }).getByText("Needs a look").click();
   const box = page.getByLabel("Write a comment");
   await box.fill("Can you check this @E2E");
