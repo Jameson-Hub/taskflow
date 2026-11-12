@@ -182,6 +182,47 @@ test("the board downloads as a CSV of what the filters show", async ({ page }) =
   expect(rows.slice(1)).toEqual([expect.stringMatching(/^"Ship it, today",To do,High,/)]);
 });
 
+test("the theme follows the system until you pick one, and your pick sticks", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  await page.getByRole("button", { name: /Manager/ }).click();
+  const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  // The browser bar colour in force: the theme-color meta whose media matches.
+  const barColour = () =>
+    page.evaluate(() => [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].find((m) => matchMedia(m.media).matches)?.content);
+  const theme = page.getByRole("button", { name: /^Theme:/ });
+  const dark = await background();
+  await expect(theme).toHaveAccessibleName("Theme: match system");
+  expect(await barColour()).toBe("#0f1117");
+
+  // Light overrides a dark system, bar included.
+  await theme.click();
+  await expect(theme).toHaveAccessibleName("Theme: light");
+  const light = await background();
+  expect(light).not.toBe(dark);
+  expect(await barColour()).toBe("#f6f7fb");
+
+  // Kept across reloads, even on the sign-in screen before the app has a signed-in user.
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.reload();
+  await expect(page.getByRole("button", { name: /Manager/ })).toBeVisible();
+  expect(await background()).toBe(light);
+  expect(await barColour()).toBe("#f6f7fb");
+
+  await page.getByRole("button", { name: /Manager/ }).click();
+  await expect(theme).toHaveAccessibleName("Theme: light");
+  await theme.click();
+  await expect(theme).toHaveAccessibleName("Theme: dark");
+  expect(await background()).toBe(dark);
+
+  // Back to following the system.
+  await theme.click();
+  await expect(theme).toHaveAccessibleName("Theme: match system");
+  await page.emulateMedia({ colorScheme: "light" });
+  expect(await background()).toBe(light);
+  expect(await barColour()).toBe("#f6f7fb");
+});
+
 test("it can be installed, and fits a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
@@ -204,4 +245,9 @@ test("it can be installed, and fits a phone screen", async ({ page }) => {
   for (const tab of ["Board", "Dashboard", "Activity", "Team"]) {
     await expect(page.getByRole("link", { name: tab, exact: true })).toBeInViewport({ ratio: 1 });
   }
+  // The top row keeps the brand, theme and sign-out side by side.
+  const top = async (name: RegExp) => (await page.getByRole("button", { name }).boundingBox())!.y;
+  expect(await top(/^Theme:/)).toBe(await top(/^Sign out$/));
+  const brand = (await page.getByRole("link", { name: "TaskFlow" }).boundingBox())!;
+  expect(await top(/^Sign out$/)).toBeLessThan(brand.y + brand.height);
 });

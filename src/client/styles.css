@@ -1,49 +1,37 @@
 :root {
+  /* Every colour is light-dark(light, dark): the theme picks one through color-scheme, below. */
   /* Chart marks, checked for colour-blind separation and contrast in both themes. */
-  --bar: #4f46e5;
-  --bar-overdue: #c2341f;
-  --bg: #f6f7fb;
-  --surface: #ffffff;
-  --surface-2: #eef0f6;
-  --border: #e2e5ee;
-  --text: #171a23;
-  --muted: #646b7d;
-  --accent: #4f46e5;
+  --bar: var(--accent);
+  --bar-overdue: light-dark(#c2341f, #e66767);
+  --bg: light-dark(#f6f7fb, #0f1117);
+  --surface: light-dark(#ffffff, #181b24);
+  --surface-2: light-dark(#eef0f6, #1f2330);
+  --border: light-dark(#e2e5ee, #2a2f3d);
+  --text: light-dark(#171a23, #e8eaf0);
+  --muted: light-dark(#646b7d, #98a0b3);
+  --accent: light-dark(#4f46e5, #7c74ff);
   --accent-text: #ffffff;
-  --danger: #c2341f;
-  --late: #c2341f;
-  --soon: #a76200;
-  --high: #c2341f;
-  --medium: #a76200;
-  --low: #2f7a4a;
-  --shadow: 0 1px 2px rgb(20 24 40 / 6%), 0 2px 8px rgb(20 24 40 / 5%);
+  --danger: light-dark(#c2341f, #ff7a66);
+  --late: var(--danger);
+  --soon: light-dark(#a76200, #f0b24a);
+  --high: var(--danger);
+  --medium: var(--soon);
+  --low: light-dark(#2f7a4a, #6fcf8f);
+  --shadow: 0 1px 2px light-dark(rgb(20 24 40 / 6%), rgb(0 0 0 / 40%)), 0 2px 8px light-dark(rgb(20 24 40 / 5%), transparent);
   --radius: 10px;
-  color-scheme: light;
+  /* Follow the system unless the theme button set data-theme (see theme.tsx). */
+  color-scheme: light dark;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 15px;
   line-height: 1.45;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1117;
-    --surface: #181b24;
-    --surface-2: #1f2330;
-    --border: #2a2f3d;
-    --text: #e8eaf0;
-    --muted: #98a0b3;
-    --accent: #7c74ff;
-    --bar: #7c74ff;
-    --bar-overdue: #e66767;
-    --danger: #ff7a66;
-    --late: #ff7a66;
-    --soon: #f0b24a;
-    --high: #ff7a66;
-    --medium: #f0b24a;
-    --low: #6fcf8f;
-    --shadow: 0 1px 2px rgb(0 0 0 / 40%);
-    color-scheme: dark;
-  }
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * {
@@ -315,8 +303,8 @@ label.check input {
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 500;
-  color: hsl(var(--hue) 70% 24%);
-  background: hsl(var(--hue) 80% 92%);
+  color: light-dark(hsl(var(--hue) 70% 24%), hsl(var(--hue) 80% 80%));
+  background: light-dark(hsl(var(--hue) 80% 92%), hsl(var(--hue) 40% 22%));
 }
 
 .label-chip button {
@@ -326,13 +314,6 @@ label.check input {
   color: inherit;
   cursor: pointer;
   line-height: 1;
-}
-
-@media (prefers-color-scheme: dark) {
-  .label-chip {
-    color: hsl(var(--hue) 80% 80%);
-    background: hsl(var(--hue) 40% 22%);
-  }
 }
 
 .card-labels {
@@ -1144,6 +1125,16 @@ main {
 
   .whoami .who {
     display: none;
+  }
+
+  /* The workspace name takes what's left of the first row and truncates, so the buttons never wrap under it. */
+  .workspace-name {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .whoami {
+    gap: 0.25rem;
   }
 
   .team td:nth-child(2),

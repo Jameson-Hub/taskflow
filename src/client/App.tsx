@@ -7,6 +7,7 @@ import { DashboardPage } from "./DashboardPage";
 import { Login } from "./Login";
 import { TeamPage } from "./TeamPage";
 import { settleBeforeSignOut } from "./signOut";
+import { ThemeToggle } from "./theme";
 import { parseHash } from "./ui";
 
 const PAGES = ["board", "dashboard", "activity", "team", "account"] as const;
@@ -125,6 +126,7 @@ export function App() {
           <span className="who">
             {user.name} <span className={`role role-${user.role}`}>{ROLE_LABEL[user.role]}</span>
           </span>
+          <ThemeToggle />
           <button className="ghost" onClick={signOut}>
             Sign out
           </button>

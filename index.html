@@ -10,8 +10,15 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <!-- Match --bg in styles.css (and the manifest's colours). -->
-    <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" data-scheme="light" content="#f6f7fb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" data-scheme="dark" content="#0f1117" media="(prefers-color-scheme: dark)" />
+    <!-- Apply a saved light/dark choice before the first paint (see src/client/theme.tsx). -->
+    <script>
+      try {
+        const theme = localStorage.getItem("theme");
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
