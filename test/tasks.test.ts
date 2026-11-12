@@ -48,6 +48,22 @@ async function taskId(cookie: string, title: string) {
   return task.id;
 }
 
+describe("one task", () => {
+  it("reads a single task, as the board lists it", async () => {
+    const cookie = await loginAs("member");
+    const [first] = await listTasks(cookie);
+    expect(await getJson(`/api/tasks/${first!.id}`, cookie)).toEqual(first);
+  });
+
+  it("is not found once deleted, or from another workspace", async () => {
+    const [first] = await listTasks(await loginAs("member"));
+    expect((await api(`/api/tasks/${first!.id}`, { cookie: sessionCookie(await signUp()) })).status).toBe(404);
+    const admin = await loginAs("admin");
+    await api(`/api/tasks/${first!.id}`, { method: "DELETE", cookie: admin });
+    expect((await api(`/api/tasks/${first!.id}`, { cookie: admin })).status).toBe(404);
+  });
+});
+
 describe("editing tasks", () => {
   it("lets a member update a task assigned to them", async () => {
     const cookie = await loginAs("member");

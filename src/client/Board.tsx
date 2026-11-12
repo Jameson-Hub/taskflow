@@ -33,6 +33,8 @@ export function Board({ user, team }: { user: User; team: User[] }) {
   // Deleting waits UNDO_MS before reaching the server, so it can be undone with comments and history intact.
   const pendingDelete = useRef<{ task: Task; timer: ReturnType<typeof setTimeout> } | null>(null);
   const [undoTask, setUndoTask] = useState<Task | null>(null);
+  // An open task deleted by someone else: the drawer says so instead of failing on save.
+  const [goneId, setGoneId] = useState<number | null>(null);
 
   // A linked task opens once, on the first load that has it; cleared so later reloads don't reopen it.
   const linkedTask = useRef(Number(linked.get("task")) || null);
@@ -42,6 +44,8 @@ export function Board({ user, team }: { user: User; team: User[] }) {
         // A task waiting out its undo window is gone as far as this board is concerned.
         const list = (await api.tasks(filters)).filter((t) => t.id !== pendingDelete.current?.task.id);
         setTasks(list);
+        // An open task follows the reload, so the drawer sees others' changes (followOpenTask covers it leaving the list).
+        setOpen((o) => (o && o !== "new" ? (list.find((t) => t.id === o.id) ?? o) : o));
         const wanted = linkedTask.current;
         if (wanted === null) return;
         linkedTask.current = null;
@@ -118,6 +122,17 @@ export function Board({ user, team }: { user: User; team: User[] }) {
     loadLabels();
   });
   useEffect(() => onBoardChange(refresh), []);
+
+  // The open task left the list: filtered out by a teammate's change, or deleted. Fetch it on its own to tell.
+  const followOpenTask = useEffectEvent(() => {
+    if (!open || open === "new" || tasks.some((t) => t.id === open.id) || goneId === open.id) return;
+    const id = open.id;
+    api.task(id).then(
+      (latest) => setOpen((o) => (o !== "new" && o?.id === id ? latest : o)),
+      (err: { status?: number }) => err.status === 404 && setGoneId(id),
+    );
+  });
+  useEffect(() => followOpenTask(), [tasks]);
 
   useEffect(() => {
     const timer = setTimeout(load, filters.q ? 250 : 0);
@@ -349,6 +364,7 @@ export function Board({ user, team }: { user: User; team: User[] }) {
             loadLabels();
           }}
           onDelete={deleteWithUndo}
+          gone={open !== "new" && open.id === goneId}
         />
       )}
 

@@ -12,27 +12,68 @@ interface Props {
   onChanged: () => void;
   /** The board removes it, with a few seconds to undo. */
   onDelete: (task: Task) => void;
+  /** Deleted by someone else while open. */
+  gone?: boolean;
 }
 
-export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDelete }: Props) {
-  const creating = task === null;
-  const editable = creating || can.editTask(user, task);
-  const [initial] = useState(() => ({
+type Field = keyof ReturnType<typeof fields>;
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const FIELD_LABEL: Record<Field, string> = {
+  title: "title",
+  description: "description",
+  status: "status",
+  priority: "priority",
+  due_date: "due date",
+  assignee_id: "assignee",
+  labels: "labels",
+  checklist: "checklist",
+};
+
+/** The editable fields of a task, as the form holds them. */
+function fields(task: Task | null, defaultAssignee: number | null) {
+  return {
     title: task?.title ?? "",
     description: task?.description ?? "",
     status: task?.status ?? ("todo" as Status),
     priority: task?.priority ?? ("medium" as Priority),
     due_date: task?.due_date ?? "",
-    assignee_id: task?.assignee?.id ?? (creating && user.role === "member" ? user.id : null),
+    assignee_id: task?.assignee?.id ?? defaultAssignee,
     labels: task?.labels ?? [],
     checklist: task?.checklist ?? [],
-  }));
+  };
+}
+
+export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDelete, gone = false }: Props) {
+  const creating = task === null;
+  // Decided when it opens: a teammate reassigning it mid-edit mustn't silently drop what you typed (the server still checks on save).
+  const [canEdit] = useState(() => creating || can.editTask(user, task));
+  const editable = canEdit && !gone;
+  const [initial, setInitial] = useState(() => fields(task, creating && user.role === "member" ? user.id : null));
   const [draft, setDraft] = useState(initial);
+  // Fields you and a teammate both changed since it loaded: yours are kept until you load theirs or save.
+  const [clashes, setClashes] = useState<Field[]>([]);
   // Closing (✕, Esc or the backdrop) asks before throwing away unsaved edits.
-  const dirty = editable && JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty = editable && !same(draft, initial);
   const keepEditing = () => dirty && !confirm("Discard your unsaved changes?");
   const close = () => {
     if (!keepEditing()) onClose();
+  };
+  // A teammate's save arrives through the board's live reload as a newer `task`. Fields you haven't touched take
+  // their value; fields you both changed keep yours. Compared by value, not updated_at (whole seconds only, and
+  // comments touch it too). Adjusting state while rendering, as React suggests; it settles once `initial` matches.
+  const theirs = task && fields(task, null);
+  if (theirs && JSON.stringify(theirs) !== JSON.stringify(initial)) {
+    const keys = Object.keys(theirs) as Field[];
+    const mine = keys.filter((k) => !same(draft[k], initial[k]));
+    setClashes([...new Set([...clashes, ...mine.filter((k) => !same(theirs[k], initial[k]) && !same(theirs[k], draft[k]))])]);
+    setDraft({ ...theirs, ...Object.fromEntries(mine.map((k) => [k, draft[k]])) });
+    setInitial(theirs);
+  }
+  // A clash goes away once your value matches theirs again.
+  const shownClashes = clashes.filter((k) => !same(draft[k], initial[k]));
+  const loadTheirs = () => {
+    setDraft({ ...draft, ...Object.fromEntries(clashes.map((k) => [k, initial[k]])) });
+    setClashes([]);
   };
   const [comments, setComments] = useState<Comment[]>([]);
   const { error, run } = useAction();
@@ -40,7 +81,11 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDel
 
   useEffect(() => {
     dialog.current?.showModal();
-    if (task) api.comments(task.id).then(setComments);
+  }, []);
+
+  // Each live reload hands over a fresh `task`, so comments reload with it.
+  useEffect(() => {
+    if (task) api.comments(task.id).then(setComments, () => {}); // a missed refresh is fixed by the next one
   }, [task]);
 
   // Members may only pick themselves; leads can pick anyone.
@@ -53,10 +98,9 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDel
       if (creating) {
         await api.createTask(payload);
       } else {
+        // Only what you changed since it was loaded, so a teammate's edit to another field isn't undone.
         const changes = Object.fromEntries(
-          Object.entries(payload).filter(
-            ([key, value]) => JSON.stringify(value) !== JSON.stringify(key === "assignee_id" ? (task.assignee?.id ?? null) : task[key as keyof Task]),
-          ),
+          Object.entries(payload).filter(([key]) => !same(draft[key as Field], initial[key as Field])),
         );
         if (Object.keys(changes).length > 0) await api.updateTask(task.id, changes);
       }
@@ -98,7 +142,22 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDel
           </button>
         </header>
 
-        {!editable && <p className="muted small">You can comment, but only the assignee, creator or a manager can edit this task.</p>}
+        {/* Always in the page, so screen readers announce what appears in it. */}
+        <div role="status">
+          {gone ? (
+            <p className="notice drawer-notice">Someone else deleted this task.</p>
+          ) : (
+            shownClashes.length > 0 && (
+              <p className="notice drawer-notice">
+                Someone else also changed the {shownClashes.map((k) => FIELD_LABEL[k]).join(", ")}. Yours is kept; saving replaces theirs.{" "}
+                <button type="button" className="ghost" onClick={loadTheirs}>
+                  Load theirs
+                </button>
+              </p>
+            )
+          )}
+        </div>
+        {!canEdit && <p className="muted small">You can comment, but only the assignee, creator or a manager can edit this task.</p>}
 
         <fieldset disabled={!editable}>
           <label>
@@ -157,7 +216,7 @@ export function TaskDrawer({ task, user, team, labels, onClose, onChanged, onDel
         <ErrorText error={error} />
 
         <div className="actions">
-          {!creating && can.deleteTask(user) && (
+          {!creating && !gone && can.deleteTask(user) && (
             <button type="button" className="danger" onClick={() => onDelete(task!)}>
               Delete
             </button>

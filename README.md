@@ -6,7 +6,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 
 ## Features
 
-- **Kanban board** with drag and drop between and within columns, updating live when anyone in the workspace changes something
+- **Kanban board** with drag and drop between and within columns, updating live when anyone in the workspace changes something. An open task updates too: a teammate's change to a field you haven't touched just appears, and if you both changed the same field yours is kept and you're told
 - **Undo delete:** a deleted task disappears at once but can be restored for 10 seconds, comments and history intact
 - **Keyboard support:** Alt/Option + arrow keys move a focused card (announced to screen readers), N opens a new task, / jumps to search
 - **Three roles**, enforced on the server:
@@ -89,9 +89,9 @@ npm run typecheck
 npm run test:e2e  # browser tests against the built app
 ```
 
-- **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, share links, search, labels, checklists, the dashboard counts, live updates, the activity log and the nightly reset.
+- **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, share links, reading one task, search, labels, checklists, the dashboard counts, live updates, the activity log and the nightly reset.
 - **Unit tests** (`test/unit/`) cover the pure logic on its own: the permission rules, password hashing, where a moved card lands and the CSV export.
-- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, @mentions, the CSV download, the theme switch, joining by invite link, sharing a read-only board, and installability and phone layout. Run them with `npm run test:e2e`; locally they use your installed Chrome.
+- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, @mentions, the CSV download, the theme switch, an open task updating live, joining by invite link, sharing a read-only board, and installability and phone layout. Run them with `npm run test:e2e`; locally they use your installed Chrome.
 
 ## Deployment
 

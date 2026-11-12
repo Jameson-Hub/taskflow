@@ -204,6 +204,91 @@ test("an admin shares a read-only board link, and can turn it off", async ({ pag
   await expect(visitor.getByText(/turned off or replaced/)).toBeVisible();
 });
 
+test("an open task updates when someone else changes it, without losing your unsaved edits", async ({ page, browser }) => {
+  const title = `Live drawer ${unique()}`;
+  await page.goto("/");
+  await page.getByRole("button", { name: /Manager/ }).click();
+  await page.getByRole("button", { name: "+ New task" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByRole("button", { name: "Create task" }).click();
+  await page.getByText(title).click();
+  const drawer = page.getByRole("dialog");
+
+  // A teammate in another browser.
+  const other = await (await browser.newContext()).newPage();
+  await other.goto("/");
+  await other.getByRole("button", { name: /Manager/ }).click();
+  const edit = async (change: (d: ReturnType<typeof other.getByRole>) => Promise<unknown>) => {
+    await other.getByText(title).click();
+    const d = other.getByRole("dialog");
+    await change(d);
+    await d.getByRole("button", { name: "Save changes" }).click();
+    await expect(d).toHaveCount(0);
+  };
+
+  // Nothing typed here yet: it just updates.
+  await edit((d) => d.getByLabel("Priority").selectOption("high"));
+  await expect(drawer.getByLabel("Priority")).toHaveValue("high");
+
+  // Mid-edit: their change to another field comes in, and what you typed stays.
+  await drawer.getByLabel("Description").fill("My notes");
+  await edit((d) => d.getByLabel("Priority").selectOption("low"));
+  await expect(drawer.getByLabel("Priority")).toHaveValue("low");
+  await expect(drawer.getByLabel("Description")).toHaveValue("My notes");
+  await expect(drawer.getByText("Someone else also changed")).toHaveCount(0);
+
+  // Both changed the same field: yours stays, and you're told.
+  await drawer.getByLabel("Priority").selectOption("high");
+  await edit((d) => d.getByLabel("Priority").selectOption("medium"));
+  await expect(drawer.getByText("Someone else also changed the priority")).toBeVisible();
+  await expect(drawer.getByLabel("Priority")).toHaveValue("high");
+  await drawer.getByRole("button", { name: "Load theirs" }).click();
+  await expect(drawer.getByLabel("Priority")).toHaveValue("medium");
+  await expect(drawer.getByLabel("Description")).toHaveValue("My notes");
+  await expect(drawer.getByText("Someone else also changed")).toHaveCount(0);
+
+  // Saving sends only what you changed, so their edit to another field isn't undone.
+  await edit((d) => d.getByLabel("Title").fill(`${title} (renamed)`));
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  await page.getByText(`${title} (renamed)`).click();
+  await expect(drawer.getByLabel("Description")).toHaveValue("My notes");
+  await expect(drawer.getByLabel("Priority")).toHaveValue("medium");
+
+  // Their comments appear too.
+  await other.getByText(`${title} (renamed)`).click();
+  await other.getByLabel("Write a comment").fill("Looks good");
+  await other.getByRole("button", { name: "Send" }).click();
+  await expect(drawer.getByText("Looks good")).toBeVisible();
+});
+
+test("an open task keeps up after leaving the filters, and says when it's deleted", async ({ page, browser }) => {
+  const title = `Followed ${unique()}`;
+  await page.goto("/");
+  await page.getByRole("button", { name: /Manager/ }).click();
+  await page.getByRole("button", { name: "+ New task" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByRole("button", { name: "Create task" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Priority" }).selectOption("medium");
+  await page.getByText(title).click();
+  const drawer = page.getByRole("dialog");
+
+  const other = await (await browser.newContext()).newPage();
+  await other.goto("/");
+  await other.getByRole("button", { name: /Manager/ }).click();
+  await other.getByText(title).click();
+  await other.getByRole("dialog").getByLabel("Priority").selectOption("high");
+  await other.getByRole("button", { name: "Save changes" }).click();
+  // No longer on this board's filtered list, but the open drawer still shows the change.
+  await expect(drawer.getByLabel("Priority")).toHaveValue("high");
+
+  await other.getByText(title).click();
+  await other.getByRole("button", { name: "Delete" }).click();
+  await other.close(); // leaving ends the undo window, so the delete goes through now
+  await expect(drawer.getByText("Someone else deleted this task")).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Save changes" })).toHaveCount(0);
+});
+
 test("the theme follows the system until you pick one, and your pick sticks", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");

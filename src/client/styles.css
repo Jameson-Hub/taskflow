@@ -1148,3 +1148,11 @@ button.card-body:hover {
   margin: 0 0 1rem;
   font-size: 1.25rem;
 }
+
+/* "Someone else also changed…" in the drawer. */
+.drawer-notice {
+  text-align: left;
+  border: 1px solid var(--soon);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+}

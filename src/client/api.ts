@@ -56,7 +56,8 @@ async function request<T>(method: string, path: string, body?: unknown, { keepal
   if (res.status === 401 && !path.startsWith("/auth/")) onSessionExpired();
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? "Something went wrong");
+  // The status rides along for callers that treat some failures differently, e.g. a 404.
+  if (!res.ok) throw Object.assign(new Error((data as { error?: string }).error ?? "Something went wrong"), { status: res.status });
   return data as T;
 }
 
@@ -85,6 +86,7 @@ export const api = {
     const query = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== "")).toString();
     return request<Task[]>("GET", `/tasks${query ? `?${query}` : ""}`);
   },
+  task: (id: number) => request<Task>("GET", `/tasks/${id}`),
   labels: () => request<string[]>("GET", "/tasks/labels"),
   stats: (today: string, mine: boolean) => request<Stats>("GET", `/stats?today=${today}${mine ? "&mine=1" : ""}`),
   createTask: (task: Partial<Task> & { assignee_id?: number | null }) => request<Task>("POST", "/tasks", task),

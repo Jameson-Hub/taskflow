@@ -148,6 +148,12 @@ tasks.get("/labels", async (c) => {
   return c.json(results.map((r) => r.name));
 });
 
+// One task, for a drawer following a task the board's filters no longer include.
+tasks.get("/:id{[0-9]+}", async (c) => {
+  const row = orNotFound(await findTask(c.env.DB, c.var.user.workspace_id, idParam(c)), "Task");
+  return c.json(toTask(row));
+});
+
 tasks.post("/", async (c) => {
   const t = await readBody(c, newTask, "A task needs a title");
   const user = c.var.user;
