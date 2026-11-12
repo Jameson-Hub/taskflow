@@ -96,3 +96,13 @@ export interface Task {
 export type SharedTask = Pick<Task, "id" | "title" | "status" | "priority" | "position" | "due_date" | "assignee" | "labels"> & {
   checklist: Pick<ChecklistItem, "done">[];
 };
+
+/** A workspace's week in numbers (GET /api/activity/weekly). The week runs from week_start up to, not including, week_end. */
+export type WeeklySummary = {
+  week_start: string;
+  week_end: string;
+  created: number;
+  finished: number;
+  comments: number;
+  busiest: { name: string; changes: number } | null;
+};

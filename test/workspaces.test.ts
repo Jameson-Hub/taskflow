@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { addTeammate, api, count, emptyDatabase, freshDatabase, getJson, loginWithPassword, loginAs, riley, runNightlyReset, sessionCookie, signUp } from "./helpers";
+import { addTeammate, api, count, emptyDatabase, freshDatabase, getJson, loginWithPassword, loginAs, riley, runNightlyJob, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
 
@@ -57,7 +57,7 @@ describe("workspace isolation", () => {
 describe("nightly job", () => {
   it("resets the demo but keeps real workspaces and their sessions", async () => {
     const { anaCookie } = await anaWithTask();
-    await runNightlyReset();
+    await runNightlyJob();
     expect((await api("/api/me", { cookie: anaCookie })).status).toBe(200);
     expect(await getJson("/api/tasks", anaCookie)).toMatchObject([{ title: "Ana's private task" }]);
   });
@@ -71,7 +71,7 @@ describe("nightly job", () => {
       .bind("ana@example.com")
       .run();
 
-    await runNightlyReset();
+    await runNightlyJob();
 
     expect((await loginWithPassword()).status).toBe(401);
     expect((await loginWithPassword({ email: "active@example.com" })).status).toBe(200);
@@ -93,7 +93,7 @@ describe("nightly job", () => {
       .bind("ana@example.com")
       .run();
 
-    await runNightlyReset();
+    await runNightlyJob();
 
     expect((await loginWithPassword()).status).toBe(401);
   });
@@ -104,7 +104,7 @@ describe("nightly job", () => {
     await env.DB.prepare("UPDATE invites SET expires_at = '2020-01-01T00:00:00.000Z'").run();
     await api("/api/invites", { method: "POST", cookie, body: { role: "member" } });
 
-    await runNightlyReset();
+    await runNightlyJob();
 
     expect(await count("SELECT COUNT(*) AS n FROM invites")).toBe(1);
   });
@@ -114,7 +114,7 @@ describe("nightly job", () => {
     await env.DB.prepare("UPDATE sessions SET expires_at = '2020-01-01T00:00:00.000Z'").run();
     const fresh = sessionCookie(await loginWithPassword());
 
-    await runNightlyReset();
+    await runNightlyJob();
 
     expect(await count("SELECT COUNT(*) AS n FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.email = 'ana@example.com'")).toBe(1);
     expect((await api("/api/me", { cookie: fresh })).status).toBe(200);
@@ -126,7 +126,7 @@ describe("fresh database", () => {
   it("still restores the demo when someone signs up before anyone opens it", async () => {
     await emptyDatabase();
     expect((await signUp()).status).toBe(201);
-    await runNightlyReset();
+    await runNightlyJob();
     expect((await api("/api/auth/demo", { method: "POST", body: { role: "admin" } })).status).toBe(200);
     expect((await loginWithPassword()).status).toBe(200);
   });

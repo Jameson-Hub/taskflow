@@ -47,9 +47,10 @@ export async function loginAs(role: Role) {
   return sessionCookie(res);
 }
 
-export async function runNightlyReset() {
+/** Runs the nightly job, as if it fired at `at` (ms since epoch; now by default). */
+export async function runNightlyJob(at = Date.now()) {
   const ctx = createExecutionContext();
-  await worker.scheduled!(createScheduledController(), env, ctx);
+  await worker.scheduled!(createScheduledController({ scheduledTime: at, cron: "0 0 * * *" }), env, ctx);
   await waitOnExecutionContext(ctx);
 }
 
@@ -98,5 +99,5 @@ export async function emptyDatabase() {
 /** Every test starts from an empty database with the demo seeded. */
 export async function freshDatabase() {
   await emptyDatabase();
-  await runNightlyReset();
+  await runNightlyJob();
 }

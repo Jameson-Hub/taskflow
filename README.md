@@ -21,7 +21,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
   | Add people, change roles | ✓ | | |
 
 - **Dashboard** with open, overdue and due-this-week counts, average days to finish, finished work per week, a "needs attention" list (with how many more there are), the next 14 days, and bar charts of work by status, priority, person and label. Click a bar to open the board filtered to it, or switch to just your own tasks.
-- **Activity log** recording who created, changed, moved, deleted or commented on what, and role changes
+- **Activity log** recording who created, changed, moved, deleted or commented on what, and role changes, with a **weekly summary** per workspace (tasks added and finished, comments, busiest person)
 - **@mentions in comments**, highlighted, with a "Mentions me" filter on the board (no emails to manage)
 - **Comments, due dates, priorities, labels, checklists** (progress shown on the card), search and filters
 - **Export to CSV**: download the tasks the current filters show, ready for Excel or Google Sheets
@@ -44,6 +44,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 | Tests | Vitest inside the Workers runtime, Playwright in a real browser, ESLint |
 | CI/CD | GitHub Actions → Wrangler |
 | Live updates | Durable Objects (one per workspace, WebSocket hibernation) |
+| Background work | Queues (weekly summaries) |
 
 ## How it works
 
@@ -52,6 +53,7 @@ Browser ──► Worker ─┬─ /api/*     → Hono routes → D1
                     ├─ /api/live  → BoardRoom Durable Object (one per workspace; WebSocket)
                     └─ else       → static React build (SPA fallback)
           Cron 00:00 UTC ──► reset demo workspace (and tell open demo boards), delete inactive ones
+                         └─ Mondays: one message per active workspace ──► Queue ──► consumer writes its weekly summary
 ```
 
 - **Sessions:** a random 256-bit token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Only its SHA-256 hash is stored, so a leaked table can't be used to sign in. Logout deletes the row. "Remember me" keeps a login for 30 days; without it the cookie ends with the browser and the server expires it within a day.
@@ -61,6 +63,7 @@ Browser ──► Worker ─┬─ /api/*     → Hono routes → D1
 - **Multi-tenancy:** every query is scoped to the caller's workspace, so another workspace's data reads as "not found". Tests prove each endpoint stays inside its workspace.
 - **Abuse without upkeep:** sign-up and login are rate-limited per IP, sign-up has a honeypot field, and a nightly job deletes workspaces nobody has used for 30 days. There is no password reset, since that would need an email domain.
 - **Authorization** lives in the API. The UI hides what a role can't do, but the server is the authority, and the tests prove it.
+- **Weekly summaries:** the run at 00:00 UTC on Mondays queues one message per workspace that did something that week, and the queue consumer counts its week and stores it, once per workspace and week, so a redelivered message changes nothing. A message that still fails after 3 tries is dropped, and that week just has no summary. The demo, reset nightly, gets a sample one. Queued so the nightly job stays quick however many workspaces there are; it reuses the one cron trigger, since the free plan's are counted per account.
 - **Ordering:** cards use fractional positions, so a move rewrites one row instead of renumbering the column.
 - **Atomic logging:** each change and its activity entry are written in one D1 batch.
 
@@ -89,9 +92,9 @@ npm run typecheck
 npm run test:e2e  # browser tests against the built app
 ```
 
-- **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, share links, reading one task, search, labels, checklists, the dashboard counts, live updates, the activity log and the nightly reset.
+- **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, share links, reading one task, search, labels, checklists, the dashboard counts, live updates, the activity log, the nightly reset and the weekly summaries.
 - **Unit tests** (`test/unit/`) cover the pure logic on its own: the permission rules, password hashing, where a moved card lands and the CSV export.
-- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, @mentions, the CSV download, the theme switch, an open task updating live, the dashboard's "+N more", joining by invite link, sharing a read-only board, and installability and phone layout. Run them with `npm run test:e2e`; locally they use your installed Chrome.
+- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, @mentions, the CSV download, the theme switch, an open task updating live, the dashboard's "+N more", the weekly summary through the queue, joining by invite link, sharing a read-only board, and installability and phone layout. Run them with `npm run test:e2e`; locally they use your installed Chrome.
 
 ## Deployment
 
@@ -106,7 +109,8 @@ One-time setup:
 
 1. `npx wrangler login`
 2. `npx wrangler d1 create taskflow` and `npx wrangler d1 create taskflow-dev`, and put each returned `database_id` in `wrangler.jsonc`
-3. In the GitHub repo settings, add secrets `CLOUDFLARE_API_TOKEN` (Workers and D1 edit permissions) and `CLOUDFLARE_ACCOUNT_ID`
+3. `npx wrangler queues create taskflow-weekly` and `npx wrangler queues create taskflow-weekly-dev` (deploys fail until they exist)
+4. In the GitHub repo settings, add secrets `CLOUDFLARE_API_TOKEN` (Workers, D1 and Queues edit permissions) and `CLOUDFLARE_ACCOUNT_ID`
 
 ## Commits
 

@@ -327,6 +327,29 @@ test("the dashboard's attention lists say how many more there are", async ({ pag
   await expect(page.getByText("+2 more")).toBeVisible();
 });
 
+test("Monday night's job writes each workspace a weekly summary, through the queue", async ({ page }) => {
+  await signUp(page, `Weekly ${unique()}`);
+  await page.getByRole("button", { name: "+ New task" }).click();
+  await page.getByLabel("Title").fill("Something this week");
+  await page.getByRole("button", { name: "Create task" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // Fire the nightly job as if it were the coming Monday, 00:00 UTC.
+  const monday = new Date();
+  monday.setUTCHours(0, 0, 0, 0);
+  monday.setUTCDate(monday.getUTCDate() + ((8 - monday.getUTCDay()) % 7 || 7));
+  // The local runtime's trigger takes the time in milliseconds.
+  const res = await page.request.get(`/cdn-cgi/handler/scheduled?cron=0+0+*+*+*&time=${monday.getTime()}`);
+  expect(res.ok()).toBe(true);
+
+  // The queue delivers in the background; the summary shows once the consumer has written it.
+  await page.getByRole("link", { name: "Activity" }).click();
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByText(/1 task added, 0 finished, 0 comments\. Busiest: E2E Admin \(1 change\)/)).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+});
+
 test("the theme follows the system until you pick one, and your pick sticks", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");

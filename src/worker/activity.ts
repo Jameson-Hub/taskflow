@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Action } from "../shared/domain";
 import { can } from "../shared/policy";
+import { recentSummaries } from "./weekly";
 import { requirePolicy, type AppEnv } from "./http";
 import type { User } from "./session";
 
@@ -36,3 +37,6 @@ activity.get("/", requirePolicy(can.viewActivity), async (c) => {
     })),
   );
 });
+
+/** The workspace's weekly summaries (see weekly.ts). */
+activity.get("/weekly", requirePolicy(can.viewActivity), async (c) => c.json(await recentSummaries(c.env.DB, c.var.user.workspace_id)));

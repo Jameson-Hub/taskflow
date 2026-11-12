@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { addTeammate, ana, api, freshDatabase, getJson, loginAs, riley, runNightlyReset, sessionCookie, signUp } from "./helpers";
+import { addTeammate, ana, api, freshDatabase, getJson, loginAs, riley, runNightlyJob, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
 
@@ -97,7 +97,7 @@ describe("read-only share link", () => {
 
   it("is cleared by the nightly demo reset", async () => {
     const token = await createLink(await loginAs("admin"));
-    await runNightlyReset();
+    await runNightlyJob();
     expect((await openLink(token)).status).toBe(404);
   });
 });

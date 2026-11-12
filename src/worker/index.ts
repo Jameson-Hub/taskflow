@@ -12,6 +12,8 @@ import { hashPassword, verifyPassword } from "./password";
 import { DEMO_WORKSPACE, deleteExpired, deleteInactiveWorkspaces, resetDemo } from "./seed";
 import { createAccount, endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
 import { live, notifyOnChange, notifyWorkspace } from "./live";
+import { consumeWeekly, isMonday, queueWeeklySummaries, type WeeklyJob } from "./weekly";
+import { isoDate } from "../shared/domain";
 import { stats } from "./stats";
 import { tasks } from "./tasks";
 import { accountDetails, roleBody, users } from "./users";
@@ -120,9 +122,10 @@ export { BoardRoom } from "./live";
 
 export default {
   fetch: app.fetch,
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
     ctx.waitUntil(
       Promise.all([
+        ...(isMonday(controller.scheduledTime) ? [queueWeeklySummaries(env, isoDate(controller.scheduledTime))] : []),
         // Open demo boards reload, find their session gone with the reset, and return to the sign-in screen.
         // The reset has happened by then; a failed ping doesn't make the run a failure.
         resetDemo(env.DB).then(() => notifyWorkspace(env, DEMO_WORKSPACE).catch(() => {})),
@@ -131,4 +134,5 @@ export default {
       ]),
     );
   },
+  queue: (batch, env, _ctx) => consumeWeekly(batch as MessageBatch<WeeklyJob>, env),
 } satisfies ExportedHandler<Env>;

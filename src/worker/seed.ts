@@ -78,7 +78,19 @@ export async function resetDemo(db: D1Database) {
           JSON.stringify(checklist),
         ),
     ),
+    // The demo is reset nightly, so it never builds up a real week; one sample summary shows visitors the feature.
+    db
+      .prepare(
+        "INSERT INTO weekly_summaries (workspace_id, week_end, created, finished, comments, busiest_name, busiest_changes) VALUES (?, ?, 4, 1, 3, ?, 7)",
+      )
+      .bind(DEMO_WORKSPACE, lastMonday(), TEAM[1].name),
   ]);
+}
+
+/** The Monday that started this week (UTC), as YYYY-MM-DD: the end of last week. */
+function lastMonday() {
+  const today = new Date();
+  return isoDate(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - ((today.getUTCDay() + 6) % 7)));
 }
 
 /** Expired sessions and invites already don't work; this just stops them piling up. */

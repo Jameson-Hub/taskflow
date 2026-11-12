@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { api, freshDatabase, loginAs, riley, runNightlyReset } from "./helpers";
+import { api, freshDatabase, loginAs, riley, runNightlyJob } from "./helpers";
 
 beforeEach(freshDatabase);
 
@@ -14,7 +14,7 @@ describe("nightly reset", () => {
       body: riley,
     });
 
-    await runNightlyReset();
+    await runNightlyJob();
 
     expect((await api("/api/me", { cookie: admin })).status).toBe(401);
     const fresh = await loginAs("admin");

@@ -1,4 +1,4 @@
-import type { Action, Priority, Role, SharedTask, Stats, Status, Task } from "../shared/domain";
+import type { Action, Priority, Role, SharedTask, Stats, Status, Task, WeeklySummary } from "../shared/domain";
 import { can as policy } from "../shared/policy";
 
 export type { Priority, Role, SharedTask, Status, Task };
@@ -100,6 +100,7 @@ export const api = {
   deleteComment: (taskId: number, id: number) => request<void>("DELETE", `/tasks/${taskId}/comments/${id}`),
 
   activity: () => request<ActivityEntry[]>("GET", "/activity"),
+  weekly: () => request<WeeklySummary[]>("GET", "/activity/weekly"),
 };
 
 // The shared policy, adapted to the API's response shapes.
