@@ -32,7 +32,7 @@ export const MAX_MENTIONS = 20;
 export const MAX_CHECKLIST_TEXT = 200;
 export type ChecklistItem = { text: string; done: boolean };
 /** "2/5": ticked items out of all of them. */
-export const checklistProgress = (items: ChecklistItem[]) => `${items.filter((i) => i.done).length}/${items.length}`;
+export const checklistProgress = (items: Pick<ChecklistItem, "done">[]) => `${items.filter((i) => i.done).length}/${items.length}`;
 /** Labels are compared and stored like this, so "Bug " and "bug" are the same label. */
 export const normalizeLabel = (label: string) => label.trim().toLowerCase();
 
@@ -88,3 +88,8 @@ export interface Task {
   labels: string[];
   checklist: ChecklistItem[];
 }
+
+/** A task as a read-only share link shows it (POST /api/shared): no description, comments, emails or checklist text. */
+export type SharedTask = Pick<Task, "id" | "title" | "status" | "priority" | "position" | "due_date" | "assignee" | "labels"> & {
+  checklist: Pick<ChecklistItem, "done">[];
+};

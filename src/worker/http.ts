@@ -26,6 +26,13 @@ export const rateLimited = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
+/** Opening a public link (no sign-in): per route and client IP, on a looser limit than sign-in. */
+export const viewLimited = createMiddleware<AppEnv>(async (c, next) => {
+  const { success } = await c.env.VIEW_LIMITER.limit({ key: `${c.req.path}:${c.req.header("CF-Connecting-IP") ?? "local"}` });
+  if (!success) fail(429, "Too many requests. Wait a minute and try again.");
+  await next();
+});
+
 export const requirePolicy = (allowed: (user: User) => boolean) =>
   createMiddleware<AppEnv>(async (c, next) => {
     if (!allowed(c.var.user)) fail(403, "Your role can't do that");

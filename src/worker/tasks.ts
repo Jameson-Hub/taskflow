@@ -39,7 +39,7 @@ const SELECT_TASK = `SELECT t.*, u.name AS assignee_name FROM tasks t LEFT JOIN 
 // Lists are stored as JSON text; every other field is stored as is. The task routes read and write through these.
 const JSON_FIELDS = new Set(["labels", "checklist"]);
 const encode = (field: string, value: unknown) => (JSON_FIELDS.has(field) ? JSON.stringify(value) : (value ?? null));
-const decode = (field: string, value: unknown) => (JSON_FIELDS.has(field) ? (JSON.parse(value as string) as unknown) : value);
+export const decode = (field: string, value: unknown) => (JSON_FIELDS.has(field) ? (JSON.parse(value as string) as unknown) : value);
 
 /** How a task's assignee appears in responses. */
 export const assigneeOf = (id: number | null, name: string | null) => (id === null ? null : { id, name: name ?? "" });

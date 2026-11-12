@@ -283,12 +283,12 @@ label.check input {
   accent-color: var(--accent);
 }
 
-.invite-link {
+.copy-field {
   display: flex;
   gap: 0.5rem;
 }
 
-.invite-link input {
+.copy-field input {
   flex: 1;
   font-family: ui-monospace, monospace;
   font-size: 0.8rem;
@@ -852,7 +852,7 @@ main {
   cursor: inherit;
 }
 
-.card-body:hover {
+button.card-body:hover {
   border-color: var(--accent);
 }
 
@@ -1141,4 +1141,10 @@ main {
   .team th:nth-child(2) {
     display: none;
   }
+}
+
+/* The read-only board a share link opens. */
+.shared-title {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
 }

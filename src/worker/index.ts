@@ -7,6 +7,7 @@ import { comments } from "./comments";
 import { account } from "./account";
 import { fail, rateLimited, readBody, requireSameOrigin, type AppEnv } from "./http";
 import { inviteAuth, invites } from "./invites";
+import { share, shared } from "./share";
 import { hashPassword, verifyPassword } from "./password";
 import { DEMO_WORKSPACE, deleteExpired, deleteInactiveWorkspaces, resetDemo } from "./seed";
 import { createAccount, endSession, publicUser, SELECT_USER, SELECT_USER_WITH_PASSWORD, sessionUser, startSession, touchLastSeen, type User } from "./session";
@@ -91,6 +92,7 @@ app.post("/auth/login", rateLimited, async (c) => {
 });
 
 app.route("/auth", inviteAuth);
+app.route("/shared", shared);
 
 app.post("/auth/logout", async (c) => {
   await endSession(c, c.env.DB);
@@ -108,6 +110,7 @@ app.route("/me", account);
 app.route("/live", live);
 app.route("/users", users);
 app.route("/invites", invites);
+app.route("/share", share);
 app.route("/tasks", tasks);
 app.route("/tasks/:taskId{[0-9]+}/comments", comments);
 app.route("/activity", activity);

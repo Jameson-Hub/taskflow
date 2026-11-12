@@ -1,4 +1,4 @@
-import { useCallback, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import {
   checklistProgress,
   DAY_MS,
@@ -9,6 +9,7 @@ import {
   MAX_LABELS,
   normalizeLabel,
   type ChecklistItem,
+  type SharedTask,
 } from "../shared/domain";
 
 /** Runs an async action, keeping its error message for display. */
@@ -31,6 +32,56 @@ export function ErrorText({ error, onDismiss }: { error: string; onDismiss?: () 
     <p className="error" role="alert" onClick={onDismiss}>
       {error}
     </p>
+  );
+}
+
+/** A link to hand on: shown read-only, selected on focus, with a Copy button. Key it by the value to reset "Copied". */
+export function CopyField({ label, value }: { label: string; value: string }) {
+  const { error, run } = useAction();
+  const [copied, setCopied] = useState(false);
+  const copy = () =>
+    run(async () => {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+    });
+  return (
+    <>
+      <div className="copy-field">
+        <input readOnly value={value} aria-label={label} onFocus={(e) => e.currentTarget.select()} />
+        <button onClick={copy}>{copied ? "Copied" : "Copy"}</button>
+      </div>
+      <ErrorText error={error} />
+    </>
+  );
+}
+
+/** What a card shows, on the board and on a share link. The board wraps it in its button; `children` go in the footer. */
+export function CardFace({ task, children }: { task: SharedTask; children?: ReactNode }) {
+  const due = task.due_date && task.status !== "done" ? dueLabel(task.due_date) : null;
+  return (
+    <>
+      <span className="card-title">{task.title}</span>
+      {task.labels.length > 0 && (
+        <span className="card-labels">
+          {task.labels.map((l) => (
+            <LabelChip key={l} name={l} />
+          ))}
+        </span>
+      )}
+      <span className="card-meta">
+        <span className={`priority priority-${task.priority}`}>{task.priority}</span>
+        {due && <span className={`due ${due.tone}`}>{due.text}</span>}
+        {task.checklist.length > 0 && (
+          <span className="muted" title="Checklist">
+            ☑ {checklistProgress(task.checklist)}
+          </span>
+        )}
+        {children}
+        <span className="avatar" title={task.assignee?.name ?? "Unassigned"}>
+          {task.assignee ? initials(task.assignee.name) : "–"}
+        </span>
+      </span>
+    </>
   );
 }
 

@@ -4,9 +4,9 @@ import { onBoardChange } from "./live";
 import { beforeSignOut } from "./signOut";
 import { byBoardOrder, columnOf, keyboardMove, placeAt, type Direction } from "../shared/moves";
 import { TaskDrawer } from "./TaskDrawer";
-import { checklistProgress, STATUSES } from "../shared/domain";
+import { STATUSES } from "../shared/domain";
 import { downloadCsv } from "./csv";
-import { dueLabel, ErrorText, initials, LabelChip, Options, parseHash, useAction } from "./ui";
+import { CardFace, ErrorText, Options, parseHash, useAction } from "./ui";
 
 const UNDO_MS = 10_000;
 const ARROWS: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
@@ -286,7 +286,6 @@ export function Board({ user, team }: { user: User; team: User[] }) {
               <ul>
                 {cards.map((task, index) => {
                   const editable = can.editTask(user, task);
-                  const due = task.due_date && task.status !== "done" ? dueLabel(task.due_date) : null;
                   return (
                     <li
                       key={task.id}
@@ -317,31 +316,13 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                         aria-describedby={editable ? "move-hint" : undefined}
                         data-movable={editable || undefined}
                       >
-                        <span className="card-title">{task.title}</span>
-                        {task.labels.length > 0 && (
-                          <span className="card-labels">
-                            {task.labels.map((l) => (
-                              <LabelChip key={l} name={l} />
-                            ))}
-                          </span>
-                        )}
-                        <span className="card-meta">
-                          <span className={`priority priority-${task.priority}`}>{task.priority}</span>
-                          {due && <span className={`due ${due.tone}`}>{due.text}</span>}
-                          {task.checklist.length > 0 && (
-                            <span className="muted" title="Checklist">
-                              ☑ {checklistProgress(task.checklist)}
-                            </span>
-                          )}
+                        <CardFace task={task}>
                           {!editable && (
                             <span className="lock" title="You can view this task but not edit it">
                               view only
                             </span>
                           )}
-                          <span className="avatar" title={task.assignee?.name ?? "Unassigned"}>
-                            {task.assignee ? initials(task.assignee.name) : "–"}
-                          </span>
-                        </span>
+                        </CardFace>
                       </button>
                     </li>
                   );

@@ -6,6 +6,7 @@ import { Board } from "./Board";
 import { DashboardPage } from "./DashboardPage";
 import { Login } from "./Login";
 import { TeamPage } from "./TeamPage";
+import { readShareToken, SharedBoard } from "./SharedBoard";
 import { settleBeforeSignOut } from "./signOut";
 import { ThemeToggle } from "./theme";
 import { parseHash } from "./ui";
@@ -27,6 +28,7 @@ export function App() {
   const [page, setPage] = useState<Page>(pageFromHash);
   // The one owner of an opened invite link: Login uses it to join, and it's dropped once someone signs in.
   const [inviteToken, setInviteToken] = useState(readInviteToken);
+  const [shareToken, setShareToken] = useState(readShareToken);
 
   // Out of the address bar and history straight away, whether or not they join.
   useEffect(() => {
@@ -40,6 +42,7 @@ export function App() {
       // Also catches an invite link pasted into a tab that's already open.
       const pasted = readInviteToken();
       if (pasted) setInviteToken(pasted);
+      setShareToken(readShareToken());
       setPage(pageFromHash());
     };
     addEventListener("hashchange", onHash);
@@ -52,6 +55,8 @@ export function App() {
     if (userId) api.users().then(setTeam);
   }, [userId]);
 
+  // A share link shows the read-only board whoever is (or isn't) signed in.
+  if (shareToken) return <SharedBoard key={shareToken} token={shareToken} />;
   if (user === undefined) return <div className="splash" aria-busy="true" />;
   if (user === null) {
     const signedIn = (u: User) => {

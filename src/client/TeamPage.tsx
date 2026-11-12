@@ -1,6 +1,6 @@
-import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
-import { api, ROLE_LABEL, type Role, type User } from "./api";
-import { ErrorText, Options, useAction } from "./ui";
+import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { api, ROLE_LABEL, type Role, type ShareStatus, type User } from "./api";
+import { CopyField, ErrorText, longDate, Options, useAction } from "./ui";
 
 interface Props {
   me: User;
@@ -11,7 +11,6 @@ interface Props {
 export function TeamPage({ me, team, setTeam }: Props) {
   const { error, run } = useAction();
   const [inviteLink, setInviteLink] = useState("");
-  const [copied, setCopied] = useState(false);
 
   function createInvite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -19,15 +18,8 @@ export function TeamPage({ me, team, setTeam }: Props) {
     run(async () => {
       const { token } = await api.createInvite(role);
       setInviteLink(`${location.origin}/#invite=${token}`);
-      setCopied(false);
     });
   }
-
-  const copyInvite = () =>
-    run(async () => {
-      await navigator.clipboard.writeText(inviteLink);
-      setCopied(true);
-    });
 
   const changeRole = (member: User, role: Role) =>
     run(async () => {
@@ -130,15 +122,65 @@ export function TeamPage({ me, team, setTeam }: Props) {
             </label>
             <button className="primary">Create invite link</button>
           </form>
-          {inviteLink && (
-            <div className="invite-link">
-              <input readOnly value={inviteLink} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} />
-              <button onClick={copyInvite}>{copied ? "Copied" : "Copy"}</button>
-            </div>
-          )}
+          {inviteLink && <CopyField key={inviteLink} label="Invite link" value={inviteLink} />}
           <p className="muted small">Send the link to one person. It works once, for 7 days, and they choose their own password.</p>
         </>
       )}
+      <ShareSettings demo={me.demo_workspace} />
     </section>
+  );
+}
+
+/** The Team page's controls for the workspace's share link (admins only). */
+function ShareSettings({ demo }: { demo: boolean }) {
+  const { error, setError, run } = useAction();
+  const [status, setStatus] = useState<ShareStatus | null>(null);
+  // Only known right after it's made: the server keeps a hash, not the link.
+  const [link, setLink] = useState("");
+
+  useEffect(() => {
+    api.shareStatus().then(setStatus, (err: Error) => setError(err.message));
+  }, [setError]);
+
+  const create = () =>
+    run(async () => {
+      const { token } = await api.createShare();
+      setLink(`${location.origin}/#share=${token}`);
+      setStatus({ enabled: true, created_at: new Date().toISOString() });
+    });
+
+  const stop = () =>
+    run(async () => {
+      await api.stopShare();
+      setLink("");
+      setStatus({ enabled: false });
+    });
+
+  if (!status) return <ErrorText error={error} />;
+  return (
+    <>
+      <h2>Share the board</h2>
+      <p className="muted small">
+        A read-only link anyone can open without signing in. It shows titles, status, priority, assignees, due dates, labels and checklist
+        progress; never descriptions, comments or emails.{demo && " In the demo, any visitor can replace or turn off this link, and the nightly reset clears it."}
+      </p>
+      <div className="row">
+        <button className="primary" onClick={create}>
+          {status.enabled ? "Replace link" : "Create share link"}
+        </button>
+        {status.enabled && <button onClick={stop}>Turn off</button>}
+      </div>
+      {link ? (
+        <CopyField key={link} label="Share link" value={link} />
+      ) : (
+        status.enabled && (
+          <p className="muted small">
+            A link is on (made {longDate(status.created_at.slice(0, 10))}). Replace it to get a copy; the
+            old one stops working.
+          </p>
+        )
+      )}
+      <ErrorText error={error} />
+    </>
   );
 }

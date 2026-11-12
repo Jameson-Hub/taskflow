@@ -1,7 +1,7 @@
-import type { Action, Priority, Role, Stats, Status, Task } from "../shared/domain";
+import type { Action, Priority, Role, SharedTask, Stats, Status, Task } from "../shared/domain";
 import { can as policy } from "../shared/policy";
 
-export type { Priority, Role, Status, Task };
+export type { Priority, Role, SharedTask, Status, Task };
 
 export interface Invite {
   workspace: string;
@@ -17,6 +17,8 @@ export interface User {
   demo_workspace: boolean;
   workspace: string;
 }
+
+export type ShareStatus = { enabled: true; created_at: string } | { enabled: false };
 
 export interface Comment {
   id: number;
@@ -68,6 +70,10 @@ export const api = {
   invite: (token: string) => request<Invite>("POST", "/auth/invite", { token }),
   join: (details: { token: string; name: string; email: string; password: string }) => request<User>("POST", "/auth/join", details),
   createInvite: (role: Role) => request<{ token: string; expires_at: string }>("POST", "/invites", { role }),
+  sharedBoard: (token: string) => request<{ workspace: string; tasks: SharedTask[] }>("POST", "/shared", { token }),
+  shareStatus: () => request<ShareStatus>("GET", "/share"),
+  createShare: () => request<{ token: string }>("POST", "/share"),
+  stopShare: () => request("DELETE", "/share"),
   changePassword: (current: string, next: string) => request("POST", "/me/password", { current, next }),
   deleteAccount: (password: string, deleteWorkspace: boolean) => request("DELETE", "/me", { password, deleteWorkspace }),
 

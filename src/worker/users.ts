@@ -67,8 +67,13 @@ users.patch("/:id{[0-9]+}", requirePolicy(can.manageTeam), async (c) => {
   if (target.role === "admin" && !(await otherAdmin(c.env.DB, target))) fail(409, "A workspace needs at least one admin");
   await c.env.DB.batch([
     c.env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, target.id),
-    // Invites are admin power; a former admin's open links stop working with it.
-    ...(role === "admin" ? [] : [c.env.DB.prepare("DELETE FROM invites WHERE created_by = ?").bind(target.id)]),
+    // Invites and share links are admin power; a former admin's links stop working with it.
+    ...(role === "admin"
+      ? []
+      : [
+          c.env.DB.prepare("DELETE FROM invites WHERE created_by = ?").bind(target.id),
+          c.env.DB.prepare("DELETE FROM board_shares WHERE created_by = ?").bind(target.id),
+        ]),
     logActivity(c.env.DB, c.var.user, null, "user.role_changed", { title: target.name, changes: { role: [target.role, role] } }),
   ]);
   return c.json(publicUser({ ...target, role }));

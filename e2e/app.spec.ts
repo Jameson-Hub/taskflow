@@ -182,6 +182,28 @@ test("the board downloads as a CSV of what the filters show", async ({ page }) =
   expect(rows.slice(1)).toEqual([expect.stringMatching(/^"Ship it, today",To do,High,/)]);
 });
 
+test("an admin shares a read-only board link, and can turn it off", async ({ page, browser }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Admin/ }).click();
+  await page.getByRole("link", { name: "Team", exact: true }).click();
+  await page.getByRole("button", { name: "Create share link" }).click();
+  const link = await page.getByLabel("Share link").inputValue();
+  expect(link).toMatch(/#share=[0-9a-f]{64}$/);
+
+  // Someone who isn't signed in.
+  const visitor = await (await browser.newContext()).newPage();
+  await visitor.goto(link);
+  await expect(visitor.getByText("Read-only")).toBeVisible();
+  await expect(visitor.getByRole("heading", { name: "Demo workspace" })).toBeVisible();
+  await expect(visitor.getByRole("region", { name: "In progress" }).getByText("Design onboarding flow")).toBeVisible();
+  await expect(visitor.getByRole("button", { name: "+ New task" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Turn off" }).click();
+  await expect(page.getByRole("button", { name: "Create share link" })).toBeVisible();
+  await visitor.reload();
+  await expect(visitor.getByText(/turned off or replaced/)).toBeVisible();
+});
+
 test("the theme follows the system until you pick one, and your pick sticks", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");

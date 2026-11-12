@@ -27,6 +27,7 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 - **Export to CSV**: download the tasks the current filters show, ready for Excel or Google Sheets
 - **Sign up for a private workspace**: you become its admin and add your team. Workspaces are fully isolated from each other.
 - **Invite links**: an admin creates a single-use link for a role, valid for 7 days, and the person joining picks their own password.
+- **Read-only share link**: an admin makes one link to show the board to people outside the team, no sign-in needed. It shows titles, status, priority, assignees, due dates, labels and checklist progress, never descriptions, comments or emails, and can be replaced or turned off.
 - **Account settings**: change your password (signs you out everywhere else) or delete your account. A deleted account is anonymised, so the board, comments and activity history stay intact; the last admin leaving deletes the workspace, after confirming.
 - **Light and dark themes**: follows the system, or pick one with the topbar button; remembered per browser and applied before the page paints
 - **Installable** on phones and desktops (web app manifest, no service worker to go stale), with a phone layout
@@ -88,9 +89,9 @@ npm run typecheck
 npm run test:e2e  # browser tests against the built app
 ```
 
-- **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, search, labels, checklists, the dashboard counts, live updates, the activity log and the nightly reset.
+- **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, share links, search, labels, checklists, the dashboard counts, live updates, the activity log and the nightly reset.
 - **Unit tests** (`test/unit/`) cover the pure logic on its own: the permission rules, password hashing, where a moved card lands and the CSV export.
-- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, @mentions, the CSV download, the theme switch, joining by invite link, and installability and phone layout. Run them with `npm run test:e2e`; locally they use your installed Chrome.
+- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, @mentions, the CSV download, the theme switch, joining by invite link, sharing a read-only board, and installability and phone layout. Run them with `npm run test:e2e`; locally they use your installed Chrome.
 
 ## Deployment
 
