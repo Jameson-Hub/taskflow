@@ -51,13 +51,13 @@ A team task board with authentication, role-based access and a Kanban workflow. 
 Browser ──► Worker ─┬─ /api/*     → Hono routes → D1
                     ├─ /api/live  → BoardRoom Durable Object (one per workspace; WebSocket)
                     └─ else       → static React build (SPA fallback)
-          Cron 00:00 UTC ──► reset demo workspace, delete inactive ones
+          Cron 00:00 UTC ──► reset demo workspace (and tell open demo boards), delete inactive ones
 ```
 
 - **Sessions:** a random 256-bit token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Only its SHA-256 hash is stored, so a leaked table can't be used to sign in. Logout deletes the row. "Remember me" keeps a login for 30 days; without it the cookie ends with the browser and the server expires it within a day.
 - **Passwords:** PBKDF2-SHA256 with a per-user salt, compared in constant time. Unknown emails still run a hash, so timing doesn't reveal which accounts exist.
 - **CSRF:** every non-GET request, and the live WebSocket, must carry an `Origin` header matching the app.
-- **Live updates:** a change that shows on the board tells the workspace's Durable Object, which sends each open board a bare "changed" (no data), and the board fetches again through the normal, permission-checked API. Idle connections hibernate, so they cost nothing.
+- **Live updates:** a change that shows on the board (or the nightly demo reset) tells the workspace's Durable Object, which sends each open board a bare "changed" (no data), and the board fetches again through the normal, permission-checked API. Idle connections hibernate, so they cost nothing.
 - **Multi-tenancy:** every query is scoped to the caller's workspace, so another workspace's data reads as "not found". Tests prove each endpoint stays inside its workspace.
 - **Abuse without upkeep:** sign-up and login are rate-limited per IP, sign-up has a honeypot field, and a nightly job deletes workspaces nobody has used for 30 days. There is no password reset, since that would need an email domain.
 - **Authorization** lives in the API. The UI hides what a role can't do, but the server is the authority, and the tests prove it.

@@ -289,6 +289,31 @@ test("an open task keeps up after leaving the filters, and says when it's delete
   await expect(drawer.getByRole("button", { name: "Save changes" })).toHaveCount(0);
 });
 
+test("an open board whose session ends returns to sign-in and says why", async ({ page, context, browser }) => {
+  await page.goto("/");
+  // Someone who was never signed in isn't told their session ended.
+  await expect(page.getByRole("button", { name: /Manager/ })).toBeVisible();
+  await expect(page.getByText(/session ended|demo was reset/)).toHaveCount(0);
+  await page.getByRole("button", { name: /Manager/ }).click();
+  await expect(page.locator(".card").first()).toBeVisible();
+  // What the nightly reset does to every demo session.
+  await context.clearCookies();
+
+  // Any change to the board makes the open one reload, which finds the session gone.
+  const other = await (await browser.newContext()).newPage();
+  await other.goto("/");
+  await other.getByRole("button", { name: /Manager/ }).click();
+  await other.getByRole("button", { name: "+ New task" }).click();
+  await other.getByLabel("Title").fill(`Ping ${unique()}`);
+  await other.getByRole("button", { name: "Create task" }).click();
+
+  await expect(page.getByText(/The demo was reset/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Manager/ })).toBeVisible();
+  await page.getByRole("button", { name: /Manager/ }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByText(/The demo was reset/)).toHaveCount(0);
+});
+
 test("the theme follows the system until you pick one, and your pick sticks", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");

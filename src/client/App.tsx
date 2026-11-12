@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AccountPage } from "./AccountPage";
 import { ActivityPage } from "./ActivityPage";
 import { api, can, ROLE_LABEL, whenSessionExpires, type User } from "./api";
@@ -29,6 +29,13 @@ export function App() {
   // The one owner of an opened invite link: Login uses it to join, and it's dropped once someone signs in.
   const [inviteToken, setInviteToken] = useState(readInviteToken);
   const [shareToken, setShareToken] = useState(readShareToken);
+  // Why the sign-in screen is showing when nobody signed out, e.g. the nightly demo reset ended the session.
+  const [endedNotice, setEndedNotice] = useState("");
+  // What kind of session was last open; none for a visitor who never signed in (their first check also gets a 401).
+  const session = useRef<"demo" | "own" | null>(null);
+  useEffect(() => {
+    if (user !== undefined) session.current = user ? (user.demo_workspace ? "demo" : "own") : null;
+  }, [user]);
 
   // Out of the address bar and history straight away, whether or not they join.
   useEffect(() => {
@@ -37,7 +44,14 @@ export function App() {
 
   useEffect(() => {
     api.me().then(setUser, () => setUser(null));
-    whenSessionExpires(() => setUser(null));
+    whenSessionExpires(() => {
+      if (session.current === "demo") {
+        setEndedNotice("The demo was reset (it does that every night at midnight UTC), so you were signed out. Pick a role to carry on.");
+      } else if (session.current === "own") {
+        setEndedNotice("Your session ended. Sign in again to carry on.");
+      }
+      setUser(null);
+    });
     const onHash = () => {
       // Also catches an invite link pasted into a tab that's already open.
       const pasted = readInviteToken();
@@ -61,10 +75,11 @@ export function App() {
   if (user === null) {
     const signedIn = (u: User) => {
       setInviteToken(null);
+      setEndedNotice("");
       setUser(u);
     };
     // Keyed by the invite, so a link pasted while on this screen opens the join form.
-    return <Login key={inviteToken ?? "none"} inviteToken={inviteToken} onSignedIn={signedIn} />;
+    return <Login key={inviteToken ?? "none"} inviteToken={inviteToken} notice={endedNotice} onSignedIn={signedIn} />;
   }
   if (inviteToken) {
     const signOutAndJoin = async () => {

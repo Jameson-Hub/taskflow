@@ -20,7 +20,16 @@ const MODES: { mode: Mode; label: string }[] = [
 ];
 
 /** `inviteToken` comes from App, which owns the invite link; it's null when the page wasn't opened from one. */
-export function Login({ inviteToken, onSignedIn }: { inviteToken: string | null; onSignedIn: (user: User) => void }) {
+export function Login({
+  inviteToken,
+  notice = "",
+  onSignedIn,
+}: {
+  inviteToken: string | null;
+  /** Why they're here without having signed out, if that's the case. */
+  notice?: string;
+  onSignedIn: (user: User) => void;
+}) {
   const { error, setError, run } = useAction();
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<Mode>(inviteToken ? "join" : "demo");
@@ -80,6 +89,7 @@ export function Login({ inviteToken, onSignedIn }: { inviteToken: string | null;
         <h1>
           <img src="/favicon.svg" alt="" width={32} height={32} /> TaskFlow
         </h1>
+        <div role="status">{notice && <p className="notice login-notice">{notice}</p>}</div>
 
         {mode === "join" ? (
           <form className="stack" onSubmit={submitJoin}>

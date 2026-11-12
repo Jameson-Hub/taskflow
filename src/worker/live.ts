@@ -43,11 +43,14 @@ export class BoardRoom extends DurableObject<Env> {
 
 const roomFor = (env: Env, workspaceId: number) => env.BOARD_ROOM.get(env.BOARD_ROOM.idFromName(String(workspaceId)));
 
+/** Tells everyone with this workspace's board open that it changed, so their boards reload. */
+export const notifyWorkspace = (env: Env, workspaceId: number) => roomFor(env, workspaceId).broadcast(LIVE.changed);
+
 /** After a successful change, tells the caller's workspace. Runs after the response, so it never slows a request down. */
 export const notifyOnChange = createMiddleware<AppEnv>(async (c, next) => {
   await next();
   if (c.req.method !== "GET" && c.res.ok) {
-    c.executionCtx.waitUntil(roomFor(c.env, c.var.user.workspace_id).broadcast(LIVE.changed));
+    c.executionCtx.waitUntil(notifyWorkspace(c.env, c.var.user.workspace_id));
   }
 });
 

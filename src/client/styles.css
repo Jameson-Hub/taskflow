@@ -1156,3 +1156,8 @@ button.card-body:hover {
   border-radius: var(--radius);
   padding: 0.5rem 0.75rem;
 }
+
+.login-notice {
+  margin-bottom: 1rem;
+  border-radius: var(--radius);
+}

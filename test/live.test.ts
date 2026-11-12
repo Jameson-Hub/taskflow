@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { LIVE } from "../src/shared/domain";
-import { addTeammate, api, freshDatabase, loginAs, riley, sessionCookie, signUp } from "./helpers";
+import { addTeammate, api, freshDatabase, loginAs, riley, runNightlyReset, sessionCookie, signUp } from "./helpers";
 
 beforeEach(freshDatabase);
 
@@ -28,6 +28,18 @@ describe("live board updates", () => {
 
     expect(member.messages).toEqual([LIVE.changed]);
     member.close();
+  });
+
+  it("tell open demo boards when the nightly reset runs, so they reload (and find they're signed out)", async () => {
+    const demo = await connect(await loginAs("member"));
+    const outsider = await connect(sessionCookie(await signUp()));
+    await runNightlyReset();
+    await settle();
+
+    expect(demo.messages).toEqual([LIVE.changed]);
+    expect(outsider.messages).toEqual([]);
+    demo.close();
+    outsider.close();
   });
 
   it("stay inside the workspace", async () => {
