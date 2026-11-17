@@ -7,6 +7,7 @@ import { TaskDrawer } from "./TaskDrawer";
 import { STATUSES } from "../shared/domain";
 import { downloadCsv } from "./csv";
 import { CardFace, ErrorText, Options, parseHash, useAction } from "./ui";
+import { touchFirst, useTouchDrag } from "./touchDrag";
 
 const UNDO_MS = 10_000;
 const ARROWS: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
@@ -141,12 +142,9 @@ export function Board({ user, team }: { user: User; team: User[] }) {
 
   const column = (status: Status) => columnOf(tasks, status);
 
-  async function drop(e: DragEvent, status: Status) {
-    e.preventDefault();
+  async function drop(status: Status, index = dropTarget?.index ?? column(status).length) {
     const task = tasks.find((t) => t.id === dragging);
-    const index = dropTarget?.index ?? column(status).length;
-    setDragging(null);
-    setDropTarget(null);
+    endDrag();
     if (!task) return;
 
     const { position } = placeAt(tasks, task, status, index);
@@ -215,13 +213,49 @@ export function Board({ user, team }: { user: User; team: User[] }) {
     return moved;
   }
 
+  function endDrag() {
+    setDragging(null);
+    setDropTarget(null);
+  }
+
+  /** Points the drop at a slot in a column: before or after the card under the pointer, or the column's end. */
+  function aim(status: Status, card?: { el: Element; index: number; y: number }) {
+    let index = column(status).length;
+    if (card) {
+      const rect = card.el.getBoundingClientRect();
+      index = card.index + (card.y > rect.top + rect.height / 2 ? 1 : 0);
+    }
+    // Drag moves fire continuously; only re-render when the slot actually changes.
+    setDropTarget((prev) => (prev?.status === status && prev.index === index ? prev : { status, index }));
+    return { status, index };
+  }
+
   function overCard(e: DragEvent, status: Status, index: number) {
     e.preventDefault();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const target = index + (e.clientY > rect.top + rect.height / 2 ? 1 : 0);
-    // dragover fires continuously; only re-render when the slot actually changes.
-    setDropTarget((prev) => (prev?.status === status && prev.index === target ? prev : { status, index: target }));
+    aim(status, { el: e.currentTarget, index, y: e.clientY });
   }
+
+  // Phones: press and hold a card, then drag it with a finger.
+  const boardRef = useRef<HTMLDivElement>(null);
+  // The slot under the finger right now: a drop can land before React has rendered the latest one.
+  const touchSlot = useRef<{ status: Status; index: number } | null>(null);
+  useTouchDrag(boardRef, {
+    pick: (el) => (el.querySelector("[data-movable]") ? Number(el.dataset.task) : null),
+    start: setDragging,
+    over: (x, y) => {
+      const under = document.elementFromPoint(x, y);
+      const section = under?.closest<HTMLElement>("[data-status]");
+      if (!section) {
+        touchSlot.current = null;
+        return setDropTarget(null);
+      }
+      const status = section.dataset.status as Status;
+      const li = under!.closest<HTMLElement>("[data-index]");
+      touchSlot.current = aim(status, li ? { el: li, index: Number(li.dataset.index), y } : undefined);
+    },
+    drop: () => (touchSlot.current ? drop(touchSlot.current.status, touchSlot.current.index) : endDrag()),
+    cancel: endDrag,
+  });
 
   return (
     <div className="board-page">
@@ -281,7 +315,7 @@ export function Board({ user, team }: { user: User; team: User[] }) {
 
       <ErrorText error={error} onDismiss={() => setError("")} />
 
-      <div className="board">
+      <div className="board" ref={boardRef}>
         {STATUSES.map((status) => {
           const cards = column(status);
           return (
@@ -289,11 +323,15 @@ export function Board({ user, team }: { user: User; team: User[] }) {
               key={status}
               className={`column ${dropTarget?.status === status ? "is-over" : ""}`}
               aria-label={STATUS_LABEL[status]}
+              data-status={status}
               onDragOver={(e) => {
                 e.preventDefault();
-                if (dropTarget?.status !== status) setDropTarget({ status, index: cards.length });
+                if (dropTarget?.status !== status) aim(status);
               }}
-              onDrop={(e) => drop(e, status)}
+              onDrop={(e) => {
+                e.preventDefault();
+                drop(status);
+              }}
             >
               <h2>
                 {STATUS_LABEL[status]} <span className="count">{cards.length}</span>
@@ -305,6 +343,7 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                     <li
                       key={task.id}
                       data-task={task.id}
+                      data-index={index}
                       className={[
                         "card",
                         dragging === task.id && "is-dragging",
@@ -313,15 +352,12 @@ export function Board({ user, team }: { user: User; team: User[] }) {
                       ]
                         .filter(Boolean)
                         .join(" ")}
-                      draggable={editable}
+                      draggable={editable && !touchFirst}
                       onDragStart={(e) => {
                         e.dataTransfer.effectAllowed = "move";
                         setDragging(task.id);
                       }}
-                      onDragEnd={() => {
-                        setDragging(null);
-                        setDropTarget(null);
-                      }}
+                      onDragEnd={endDrag}
                       onDragOver={(e) => overCard(e, status, index)}
                     >
                       <button

@@ -811,6 +811,16 @@ main {
   position: relative;
 }
 
+/* On a touch screen a press and hold drags a card, so it shouldn't select text or open the copy menu too.
+   The whole board, not just the cards: iOS otherwise selects the nearest text it can, like a column heading. */
+@media (hover: none) {
+  .board {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
 .card[draggable="true"] {
   cursor: grab;
 }

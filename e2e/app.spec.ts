@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { devices, expect, test, type Page } from "@playwright/test";
 
 // Every run signs up fresh people, so runs don't depend on each other or on leftover data.
 const unique = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -9,6 +9,12 @@ async function fillNewAccount(page: Page, name: string, email: string) {
   await page.getByLabel("Your name").fill(name);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
+}
+
+async function newTask(page: Page, title: string) {
+  await page.getByRole("button", { name: "+ New task" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByRole("button", { name: "Create task" }).click();
 }
 
 async function signUp(page: Page, workspace: string) {
@@ -103,14 +109,61 @@ test("the board works from the keyboard: shortcuts, and moving a card without a 
   await expect(page.getByLabel("Search tasks")).toBeFocused();
 });
 
+test("with a mouse, a card drags to another column", async ({ page }) => {
+  await signUp(page, `Mouse ${unique()}`);
+  await newTask(page, "Drag me with the mouse");
+  const done = page.getByRole("region", { name: "Done" });
+  await page.getByRole("region", { name: "To do" }).locator(".card").first().dragTo(done);
+  await expect(done.getByText("Drag me with the mouse")).toBeVisible();
+  await page.reload(); // and it was saved, not just shown
+  await expect(done.getByText("Drag me with the mouse")).toBeVisible();
+});
+
+test.describe("on a phone", () => {
+  const { defaultBrowserType: _, ...phone } = devices["Pixel 7"];
+  test.use(phone);
+
+  test("press and hold a card to drag it to another column", async ({ page, context }) => {
+    await signUp(page, `Touch ${unique()}`);
+    await newTask(page, "Drag me with a finger");
+    const todo = page.getByRole("region", { name: "To do" });
+    const inProgress = page.getByRole("region", { name: "In progress" });
+    await expect(todo.getByText("Drag me with a finger")).toBeVisible();
+
+    // Real touch input, as a phone sends it: Playwright's mouse can't stand in for a finger.
+    const cdp = await context.newCDPSession(page);
+    const touch = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) =>
+      cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y }] });
+    const from = (await todo.locator(".card").first().boundingBox())!;
+    const to = (await inProgress.boundingBox())!;
+    const [x0, y0] = [from.x + from.width / 2, from.y + from.height / 2];
+    const [x1, y1] = [to.x + to.width / 2, to.y + 60];
+
+    await touch("touchStart", x0, y0);
+    await page.waitForTimeout(600); // comfortably past the 350ms hold
+    for (let i = 1; i <= 10; i++) {
+      await touch("touchMove", x0 + ((x1 - x0) * i) / 10, y0 + ((y1 - y0) * i) / 10);
+      await page.waitForTimeout(30);
+    }
+    await touch("touchEnd");
+
+    await expect(inProgress.getByText("Drag me with a finger")).toBeVisible();
+    await expect(todo.getByText("Drag me with a finger")).toHaveCount(0);
+    // Letting go doesn't count as a tap, so the task doesn't open.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // A plain tap still opens it.
+    await inProgress.getByRole("button", { name: /Drag me with a finger/ }).tap();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+});
+
 test("a deleted task can be undone for a few seconds, then it's gone for good", async ({ page }) => {
   await page.clock.install();
   await signUp(page, `Undo ${unique()}`);
   const todo = page.getByRole("region", { name: "To do" });
   const add = async (title: string) => {
-    await page.getByRole("button", { name: "+ New task" }).click();
-    await page.getByLabel("Title").fill(title);
-    await page.getByRole("button", { name: "Create task" }).click();
+    await newTask(page, title);
     await expect(todo.getByText(title)).toBeVisible();
   };
   const remove = async (title: string) => {
@@ -142,9 +195,7 @@ test("a deleted task can be undone for a few seconds, then it's gone for good", 
 test("@mentions suggest teammates, are highlighted, and drive the 'Mentions me' filter", async ({ page }) => {
   await signUp(page, `Mentions ${unique()}`);
   for (const title of ["Needs a look", "Nobody mentioned here"]) {
-    await page.getByRole("button", { name: "+ New task" }).click();
-    await page.getByLabel("Title").fill(title);
-    await page.getByRole("button", { name: "Create task" }).click();
+    await newTask(page, title);
   }
 
   // Nothing matches yet: the board says so, rather than calling itself empty.
@@ -214,9 +265,7 @@ test("an open task updates when someone else changes it, without losing your uns
   const title = `Live drawer ${unique()}`;
   await page.goto("/");
   await page.getByRole("button", { name: /Manager/ }).click();
-  await page.getByRole("button", { name: "+ New task" }).click();
-  await page.getByLabel("Title").fill(title);
-  await page.getByRole("button", { name: "Create task" }).click();
+  await newTask(page, title);
   await page.getByText(title).click();
   const drawer = page.getByRole("dialog");
 
@@ -271,9 +320,7 @@ test("an open task keeps up after leaving the filters, and says when it's delete
   const title = `Followed ${unique()}`;
   await page.goto("/");
   await page.getByRole("button", { name: /Manager/ }).click();
-  await page.getByRole("button", { name: "+ New task" }).click();
-  await page.getByLabel("Title").fill(title);
-  await page.getByRole("button", { name: "Create task" }).click();
+  await newTask(page, title);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("combobox", { name: "Priority" }).selectOption("medium");
   await page.getByText(title).click();
@@ -335,9 +382,7 @@ test("the dashboard's attention lists say how many more there are", async ({ pag
 
 test("Monday night's job writes each workspace a weekly summary, through the queue", async ({ page }) => {
   await signUp(page, `Weekly ${unique()}`);
-  await page.getByRole("button", { name: "+ New task" }).click();
-  await page.getByLabel("Title").fill("Something this week");
-  await page.getByRole("button", { name: "Create task" }).click();
+  await newTask(page, "Something this week");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Fire the nightly job as if it were the coming Monday, 00:00 UTC.

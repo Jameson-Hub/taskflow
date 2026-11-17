@@ -94,7 +94,7 @@ npm run test:e2e  # browser tests against the built app
 
 - **Integration tests** (`test/*.test.ts`) go through the HTTP API the way the app does: sign-in and sessions, CSRF, what each role can and can't do, task and comment rules, share links, reading one task, search, labels, checklists, the dashboard counts, live updates, the activity log, the nightly reset and the weekly summaries.
 - **Unit tests** (`test/unit/`) cover the pure logic on its own: the permission rules, password hashing, where a moved card lands and the CSV export.
-- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, undoing a delete, @mentions, the CSV download, the theme switch, an open task updating live, the dashboard's "+N more", the weekly summary through the queue, joining by invite link, sharing a read-only board, and installability and phone layout. Run them with `npm run test:e2e`; locally they use your installed Chrome.
+- **Browser tests** (`e2e/`, Playwright) click through the built app against a local database: the demo, signing up and finishing a task, the keyboard controls, dragging a card with a mouse or a finger, undoing a delete, @mentions, the CSV download, the theme switch, an open task updating live, the dashboard's "+N more", the weekly summary through the queue, joining by invite link, sharing a read-only board, and installability and phone layout. Run them with `npm run test:e2e`; locally they use your installed Chrome.
 
 ## Deployment
 
