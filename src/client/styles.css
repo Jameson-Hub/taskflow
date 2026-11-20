@@ -3,27 +3,35 @@
   /* Chart marks, checked for colour-blind separation and contrast in both themes. */
   --bar: var(--accent);
   --bar-overdue: light-dark(#c2341f, #e66767);
-  --bg: light-dark(#f6f7fb, #0f1117);
-  --surface: light-dark(#ffffff, #181b24);
-  --surface-2: light-dark(#eef0f6, #1f2330);
-  --border: light-dark(#e2e5ee, #2a2f3d);
-  --text: light-dark(#171a23, #e8eaf0);
-  --muted: light-dark(#646b7d, #98a0b3);
-  --accent: light-dark(#4f46e5, #7c74ff);
-  --accent-text: #ffffff;
-  --danger: light-dark(#c2341f, #ff7a66);
+  /* Atlassian design-system neutrals and blue, so the app reads like Jira. */
+  --bg: light-dark(#ffffff, #1d2125);
+  --surface: light-dark(#ffffff, #22272b);
+  --surface-2: light-dark(#f1f2f4, #2c333a);
+  --column: light-dark(#f7f8f9, #161a1d);
+  --sidebar: light-dark(#fafbfc, #1d2125);
+  --hover: light-dark(rgb(9 30 66 / 6%), rgb(161 189 217 / 8%));
+  --selected: light-dark(#e9f2ff, #1c2b41);
+  --border: light-dark(#dcdfe4, #38414a);
+  --text: light-dark(#172b4d, #b6c2cf);
+  --heading: light-dark(#172b4d, #dee4ea);
+  --muted: light-dark(#626f86, #8c9bab);
+  --accent: light-dark(#0c66e4, #579dff);
+  --accent-hover: light-dark(#0055cc, #85b8ff);
+  --accent-text: light-dark(#ffffff, #1d2125);
+  --danger: light-dark(#c9372c, #f87168);
   --late: var(--danger);
   --soon: light-dark(#a76200, #f0b24a);
   --high: var(--danger);
   --medium: var(--soon);
-  --low: light-dark(#2f7a4a, #6fcf8f);
-  --shadow: 0 1px 2px light-dark(rgb(20 24 40 / 6%), rgb(0 0 0 / 40%)), 0 2px 8px light-dark(rgb(20 24 40 / 5%), transparent);
-  --radius: 10px;
+  --low: light-dark(#1d7afc, #579dff);
+  --shadow: 0 1px 1px light-dark(rgb(9 30 66 / 25%), rgb(3 4 4 / 50%)), 0 0 1px light-dark(rgb(9 30 66 / 31%), rgb(3 4 4 / 50%));
+  --shadow-raised: 0 8px 12px light-dark(rgb(9 30 66 / 15%), rgb(3 4 4 / 36%)), 0 0 1px light-dark(rgb(9 30 66 / 31%), rgb(3 4 4 / 50%));
+  --radius: 3px;
   /* Follow the system unless the theme button set data-theme (see theme.tsx). */
   color-scheme: light dark;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 15px;
-  line-height: 1.45;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Ubuntu, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.43;
 }
 
 :root[data-theme="light"] {
@@ -49,6 +57,14 @@ h2,
 h3 {
   margin: 0;
   line-height: 1.2;
+  color: var(--heading);
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 1.7rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 a {
@@ -77,10 +93,17 @@ input,
 select,
 textarea {
   width: 100%;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  padding: 0.45rem 0.6rem;
+  border: 2px solid var(--border);
+  border-width: 1px;
+  border-radius: var(--radius);
+  background: light-dark(#ffffff, #22272b);
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  background: light-dark(#f7f8f9, #282e33);
 }
 
 input:focus-visible,
@@ -95,15 +118,24 @@ a:focus-visible {
 button {
   cursor: pointer;
   border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 0.5rem 0.9rem;
-  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.75rem;
+  background: var(--hover);
+  font-weight: 500;
   white-space: nowrap;
+}
+
+button:hover:not(:disabled) {
+  background: light-dark(rgb(9 30 66 / 12%), rgb(161 189 217 / 16%));
 }
 
 button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 button.primary {
@@ -119,7 +151,7 @@ button.ghost {
 
 button.ghost:hover {
   color: var(--text);
-  background: var(--surface-2);
+  background: var(--hover);
 }
 
 button.danger {
@@ -133,7 +165,7 @@ label,
   display: grid;
   gap: 0.3rem;
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--muted);
 }
 
@@ -156,8 +188,8 @@ fieldset {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius);
   background: var(--surface-2);
 }
 
@@ -177,13 +209,13 @@ fieldset {
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--surface-2);
-  font-size: 0.7rem;
+  background: light-dark(#0055cc, #85b8ff);
+  font-size: 0.65rem;
   font-weight: 700;
-  color: var(--muted);
+  color: var(--accent-text);
 }
 
 .splash {
@@ -193,6 +225,7 @@ fieldset {
 /* Login */
 
 .login {
+  background: light-dark(#f7f8f9, #161a1d);
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -203,9 +236,9 @@ fieldset {
   width: min(460px, 100%);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 2rem;
-  box-shadow: var(--shadow);
+  border-radius: 4px;
+  padding: 2rem 2.5rem;
+  box-shadow: var(--shadow-raised);
   display: grid;
   gap: 1.2rem;
 }
@@ -247,7 +280,7 @@ fieldset {
   grid-template-columns: repeat(3, 1fr);
   gap: 0.25rem;
   padding: 0.25rem;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface-2);
 }
 
@@ -299,8 +332,8 @@ label.check input {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.05rem 0.45rem;
-  border-radius: 999px;
+  padding: 0 0.35rem;
+  border-radius: var(--radius);
   font-size: 0.72rem;
   font-weight: 500;
   color: light-dark(hsl(var(--hue) 70% 24%), hsl(var(--hue) 80% 80%));
@@ -679,53 +712,41 @@ mark.mention {
   overflow: hidden;
 }
 
-.workspace-name {
-  color: var(--muted);
-  font-size: 0.9rem;
-  padding-left: 1rem;
-  border-left: 1px solid var(--border);
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Shell: Jira-style top bar, project sidebar and content area. */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Shell */
-
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.75rem 1.25rem;
+  gap: 1rem;
+  height: 56px;
+  padding: 0 1rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius);
+  font-size: 1.05rem;
   font-weight: 700;
+  color: var(--heading);
   text-decoration: none;
 }
 
-.tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.tabs a {
-  text-decoration: none;
-  padding: 0.4rem 0.75rem;
-  border-radius: 8px;
-  color: var(--muted);
-}
-
-.tabs a[aria-current="page"] {
-  background: var(--surface-2);
-  color: var(--text);
-  font-weight: 600;
+.brand:hover {
+  background: var(--hover);
 }
 
 .whoami {
@@ -735,31 +756,168 @@ mark.mention {
   gap: 0.5rem;
 }
 
+.avatar-me {
+  width: 28px;
+  height: 28px;
+  font-size: 0.7rem;
+}
+
+.layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.sidebar {
+  position: sticky;
+  top: 56px;
+  align-self: flex-start;
+  flex: none;
+  width: 240px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 1.5rem 0.5rem;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+}
+
+.project {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.5rem 1.25rem;
+}
+
+.project-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background: light-dark(#6e5dc6, #9f8fef);
+  color: var(--accent-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.project-text {
+  display: grid;
+  min-width: 0;
+}
+
+.workspace-name {
+  font-weight: 600;
+  color: var(--heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-kind {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.sidebar-heading {
+  margin: 0 0 0.25rem;
+  padding: 0 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.tabs {
+  display: grid;
+  gap: 2px;
+}
+
+.tabs a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.tabs a:hover {
+  background: var(--hover);
+}
+
+.tabs a[aria-current="page"] {
+  background: var(--selected);
+  color: var(--accent);
+}
+
+/* The blue bar Jira puts on the selected sidebar item. */
+.tabs a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+
+.nav-icon {
+  flex: none;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .notice {
   margin: 0;
-  padding: 0.4rem 1.25rem;
-  font-size: 0.8rem;
-  color: var(--muted);
-  background: var(--surface-2);
+  padding: 0.5rem 1.25rem;
+  font-size: 0.85rem;
+  color: light-dark(#172b4d, #dee4ea);
+  background: light-dark(#e9f2ff, #1c2b41);
   text-align: center;
 }
 
 main {
-  padding: 1.25rem;
+  padding: 1.5rem 2.5rem;
+}
+
+.breadcrumbs {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.board-head {
+  margin-bottom: 1.25rem;
 }
 
 /* Board */
 
 .toolbar {
   display: flex;
+  align-items: center;
   gap: 0.6rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   flex-wrap: wrap;
 }
 
 .toolbar input[type="search"] {
-  flex: 1 1 220px;
+  flex: 0 1 240px;
   width: auto;
+}
+
+.toolbar .primary {
+  margin-left: auto;
 }
 
 .toolbar select {
@@ -768,30 +926,32 @@ main {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  gap: 0.75rem;
   align-items: start;
 }
 
 .column {
-  background: var(--surface-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  min-height: 200px;
-  transition: border-color 0.15s;
+  background: var(--column);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 0.5rem;
+  min-height: 70vh;
+  transition: border-color 0.15s, background-color 0.15s;
 }
 
 .column.is-over {
   border-color: var(--accent);
+  background: var(--selected);
 }
 
 .column h2 {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   color: var(--muted);
-  margin: 0.25rem 0.25rem 0.75rem;
+  margin: 0.4rem 0.4rem 0.75rem;
 }
 
 .count {
@@ -804,7 +964,7 @@ main {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .card {
@@ -851,39 +1011,50 @@ main {
 .card-body {
   width: 100%;
   display: grid;
-  gap: 0.6rem;
+  gap: 0.5rem;
   padding: 0.75rem;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  font-weight: 400;
   text-align: left;
   white-space: normal;
   cursor: inherit;
 }
 
-button.card-body:hover {
-  border-color: var(--accent);
+button.card-body:hover:not(:disabled) {
+  background: light-dark(#f7f8f9, #282e33);
 }
 
 .card-title {
-  font-weight: 500;
+  color: var(--heading);
+  overflow-wrap: anywhere;
 }
 
 .card-meta {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.78rem;
+  gap: 0.4rem;
+  font-size: 0.75rem;
 }
 
 .card-meta .avatar {
   margin-left: auto;
 }
 
-.priority {
+.avatar.unassigned {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.issue-key {
   font-weight: 600;
-  text-transform: capitalize;
+  color: var(--muted);
+}
+
+.priority {
+  display: inline-flex;
 }
 
 .priority-high {
@@ -933,13 +1104,14 @@ button.card-body:hover {
   border: 0;
   border-left: 1px solid var(--border);
   padding: 0;
+  box-shadow: var(--shadow-raised);
   background: var(--surface);
   color: var(--text);
   overflow-y: auto;
 }
 
 .drawer::backdrop {
-  background: rgb(10 12 20 / 45%);
+  background: rgb(9 30 66 / 54%);
 }
 
 .drawer-body,
@@ -1103,15 +1275,48 @@ button.card-body:hover {
     grid-template-columns: 1fr;
   }
 
-  /* Logo, workspace and Sign out first; the tabs get their own row and wrap, so none are hidden. */
-  .topbar {
-    gap: 0.5rem 1rem;
+  .column {
+    min-height: 120px;
+  }
+
+  /* The sidebar becomes a strip above the page: workspace, then the sections in a wrapping row. */
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: static;
+    align-self: stretch;
+    width: auto;
+    height: auto;
+    padding: 0.75rem 0.5rem 0.5rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .project {
+    padding-bottom: 0.5rem;
+  }
+
+  .sidebar-heading {
+    display: none;
   }
 
   .tabs {
-    order: 3;
-    width: 100%;
+    display: flex;
     flex-wrap: wrap;
+  }
+
+  .tabs a[aria-current="page"]::before {
+    display: none;
+  }
+
+  .topbar {
+    gap: 0.5rem;
+  }
+
+  .avatar-me {
+    display: none;
   }
 
   /* Search across the top, then the filters two to a row. */
@@ -1123,6 +1328,7 @@ button.card-body:hover {
   .toolbar input[type="search"],
   .toolbar .primary {
     grid-column: 1 / -1;
+    margin-left: 0;
   }
 
   .toolbar select {
@@ -1135,12 +1341,6 @@ button.card-body:hover {
 
   .whoami .who {
     display: none;
-  }
-
-  /* The workspace name takes what's left of the first row and truncates, so the buttons never wrap under it. */
-  .workspace-name {
-    flex: 1 1 0;
-    min-width: 0;
   }
 
   .whoami {

@@ -259,6 +259,14 @@ export function Board({ user, team }: { user: User; team: User[] }) {
 
   return (
     <div className="board-page">
+      <header className="page-head board-head">
+        <div>
+          <nav className="breadcrumbs" aria-label="Breadcrumb">
+            Workspaces / Board
+          </nav>
+          <h1>{user.workspace} board</h1>
+        </div>
+      </header>
       <div className="toolbar">
         <input
           ref={search}

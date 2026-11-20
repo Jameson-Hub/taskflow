@@ -69,7 +69,8 @@ export function CardFace({ task, children }: { task: SharedTask; children?: Reac
         </span>
       )}
       <span className="card-meta">
-        <span className={`priority priority-${task.priority}`}>{task.priority}</span>
+        <span className="issue-key">TF-{task.id}</span>
+        <PriorityIcon priority={task.priority} />
         {due && <span className={`due ${due.tone}`}>{due.text}</span>}
         {task.checklist.length > 0 && (
           <span className="muted" title="Checklist">
@@ -77,11 +78,29 @@ export function CardFace({ task, children }: { task: SharedTask; children?: Reac
           </span>
         )}
         {children}
-        <span className="avatar" title={task.assignee?.name ?? "Unassigned"}>
+        <span className={task.assignee ? "avatar" : "avatar unassigned"} title={task.assignee?.name ?? "Unassigned"}>
           {task.assignee ? initials(task.assignee.name) : "–"}
         </span>
       </span>
     </>
+  );
+}
+
+/** Jira-style priority: two chevrons up for high, a bar for medium, a chevron down for low. */
+const PRIORITY_PATH: Record<SharedTask["priority"], string> = {
+  high: "M4 11l4-4 4 4M4 7l4-4 4 4",
+  medium: "M3 6h10M3 10h10",
+  low: "M4 6l4 4 4-4",
+};
+
+function PriorityIcon({ priority }: { priority: SharedTask["priority"] }) {
+  return (
+    <span className={`priority priority-${priority}`} title={`${priority} priority`}>
+      <svg viewBox="0 0 16 16" width={16} height={16} aria-hidden="true">
+        <path d={PRIORITY_PATH[priority]} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="sr-only">{priority} priority</span>
+    </span>
   );
 }
 

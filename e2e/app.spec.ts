@@ -412,21 +412,21 @@ test("the theme follows the system until you pick one, and your pick sticks", as
   const theme = page.getByRole("button", { name: /^Theme:/ });
   const dark = await background();
   await expect(theme).toHaveAccessibleName("Theme: match system");
-  expect(await barColour()).toBe("#0f1117");
+  expect(await barColour()).toBe("#1d2125");
 
   // Light overrides a dark system, bar included.
   await theme.click();
   await expect(theme).toHaveAccessibleName("Theme: light");
   const light = await background();
   expect(light).not.toBe(dark);
-  expect(await barColour()).toBe("#f6f7fb");
+  expect(await barColour()).toBe("#ffffff");
 
   // Kept across reloads, even on the sign-in screen before the app has a signed-in user.
   await page.getByRole("button", { name: "Sign out" }).click();
   await page.reload();
   await expect(page.getByRole("button", { name: /Manager/ })).toBeVisible();
   expect(await background()).toBe(light);
-  expect(await barColour()).toBe("#f6f7fb");
+  expect(await barColour()).toBe("#ffffff");
 
   await page.getByRole("button", { name: /Manager/ }).click();
   await expect(theme).toHaveAccessibleName("Theme: light");
@@ -439,7 +439,7 @@ test("the theme follows the system until you pick one, and your pick sticks", as
   await expect(theme).toHaveAccessibleName("Theme: match system");
   await page.emulateMedia({ colorScheme: "light" });
   expect(await background()).toBe(light);
-  expect(await barColour()).toBe("#f6f7fb");
+  expect(await barColour()).toBe("#ffffff");
 });
 
 test("it can be installed, and fits a phone screen", async ({ page }) => {
