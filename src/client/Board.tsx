@@ -261,9 +261,7 @@ export function Board({ user, team }: { user: User; team: User[] }) {
     <div className="board-page">
       <header className="page-head board-head">
         <div>
-          <nav className="breadcrumbs" aria-label="Breadcrumb">
-            Workspaces / Board
-          </nav>
+          <p className="breadcrumbs">Workspaces / Board</p>
           <h1>{user.workspace} board</h1>
         </div>
       </header>

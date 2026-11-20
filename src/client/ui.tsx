@@ -56,7 +56,8 @@ export function CopyField({ label, value }: { label: string; value: string }) {
 }
 
 /** What a card shows, on the board and on a share link. The board wraps it in its button; `children` go in the footer. */
-export function CardFace({ task, children }: { task: SharedTask; children?: ReactNode }) {
+/** `showKey` is off on the public share board, which shouldn't reveal task ids. */
+export function CardFace({ task, showKey = true, children }: { task: SharedTask; showKey?: boolean; children?: ReactNode }) {
   const due = task.due_date && task.status !== "done" ? dueLabel(task.due_date) : null;
   return (
     <>
@@ -69,7 +70,7 @@ export function CardFace({ task, children }: { task: SharedTask; children?: Reac
         </span>
       )}
       <span className="card-meta">
-        <span className="issue-key">TF-{task.id}</span>
+        {showKey && <span className="issue-key">TF-{task.id}</span>}
         <PriorityIcon priority={task.priority} />
         {due && <span className={`due ${due.tone}`}>{due.text}</span>}
         {task.checklist.length > 0 && (

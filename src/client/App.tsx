@@ -150,7 +150,7 @@ export function App() {
               {initials(user.workspace)}
             </span>
             <div className="project-text">
-              <span className="workspace-name" title="Workspace">
+              <span className="project-name" title="Workspace">
                 {user.workspace}
               </span>
               <span className="project-kind">Team workspace</span>

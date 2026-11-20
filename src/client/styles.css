@@ -10,6 +10,8 @@
   --column: light-dark(#f7f8f9, #161a1d);
   --sidebar: light-dark(#fafbfc, #1d2125);
   --hover: light-dark(rgb(9 30 66 / 6%), rgb(161 189 217 / 8%));
+  --hover-strong: light-dark(rgb(9 30 66 / 12%), rgb(161 189 217 / 16%));
+  --surface-hover: light-dark(#f7f8f9, #282e33);
   --selected: light-dark(#e9f2ff, #1c2b41);
   --border: light-dark(#dcdfe4, #38414a);
   --text: light-dark(#172b4d, #b6c2cf);
@@ -94,16 +96,15 @@ select,
 textarea {
   width: 100%;
   padding: 0.45rem 0.6rem;
-  border: 2px solid var(--border);
-  border-width: 1px;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: light-dark(#ffffff, #22272b);
+  background: var(--surface);
 }
 
 input:hover,
 select:hover,
 textarea:hover {
-  background: light-dark(#f7f8f9, #282e33);
+  background: var(--surface-hover);
 }
 
 input:focus-visible,
@@ -126,7 +127,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: light-dark(rgb(9 30 66 / 12%), rgb(161 189 217 / 16%));
+  background: var(--hover-strong);
 }
 
 button:disabled {
@@ -134,14 +135,14 @@ button:disabled {
   opacity: 0.6;
 }
 
-button.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
 button.primary {
   background: var(--accent);
   color: var(--accent-text);
   font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 button.ghost {
@@ -212,7 +213,7 @@ fieldset {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: light-dark(#0055cc, #85b8ff);
+  background: var(--accent-hover);
   font-size: 0.65rem;
   font-weight: 700;
   color: var(--accent-text);
@@ -225,7 +226,7 @@ fieldset {
 /* Login */
 
 .login {
-  background: light-dark(#f7f8f9, #161a1d);
+  background: var(--column);
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -806,7 +807,16 @@ mark.mention {
   min-width: 0;
 }
 
+/* The share page's "Read-only" label in the top bar. */
 .workspace-name {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.project-name {
   font-weight: 600;
   color: var(--heading);
   overflow: hidden;
@@ -882,8 +892,8 @@ mark.mention {
   margin: 0;
   padding: 0.5rem 1.25rem;
   font-size: 0.85rem;
-  color: light-dark(#172b4d, #dee4ea);
-  background: light-dark(#e9f2ff, #1c2b41);
+  color: var(--heading);
+  background: var(--selected);
   text-align: center;
 }
 
@@ -926,7 +936,7 @@ main {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
   align-items: start;
 }
@@ -1024,7 +1034,7 @@ main {
 }
 
 button.card-body:hover:not(:disabled) {
-  background: light-dark(#f7f8f9, #282e33);
+  background: var(--surface-hover);
 }
 
 .card-title {
@@ -1355,8 +1365,7 @@ button.card-body:hover:not(:disabled) {
 
 /* The read-only board a share link opens. */
 .shared-title {
-  margin: 0 0 1rem;
-  font-size: 1.25rem;
+  margin: 0 0 1.25rem;
 }
 
 /* "Someone else also changed…" in the drawer. */

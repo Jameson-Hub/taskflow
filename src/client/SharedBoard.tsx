@@ -54,7 +54,7 @@ export function SharedBoard({ token }: { token: string }) {
                       {cards.map((task) => (
                         <li key={task.id} className="card">
                           <div className="card-body">
-                            <CardFace task={task} />
+                            <CardFace task={task} showKey={false} />
                           </div>
                         </li>
                       ))}
